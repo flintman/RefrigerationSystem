@@ -13,6 +13,7 @@ float return_temp = -327.0;
 float supply_temp = -327.0;
 float coil_temp = -327.0;
 float setpoint = 55.0;
+std::string system_status = "Null";
 
 ConfigManager cfg(config_file_name);
 SensorManager sensors;
