@@ -5,6 +5,7 @@
 
 
 void display_all_variables(){
+    std::cout << "YOU NEED TO RUN config_editor to initalize the sensors.....\n\n\n\n";
     std::cout << "Logging Interval: " << cfg.get("logging.interval_sec") << " seconds\n";
     std::cout << "Log Retention Period: " << cfg.get("logging.retention_period") << " days\n";
     std::cout << "TRL Number: " << cfg.get("trl.number") << "\n";
@@ -23,7 +24,9 @@ void display_all_variables(){
 
 
 int main() {
-    display_all_variables();
+    if (cfg.get("sensor.return") == "0") {
+        display_all_variables();
+    }
 
     return 0;
 }
