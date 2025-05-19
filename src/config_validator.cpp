@@ -12,7 +12,10 @@ ConfigValidator::ConfigValidator() {
         {"setpoint.offset",          {"2", ConfigType::Integer}},
         {"compressor.off_timer",     {"5", ConfigType::Integer}},
         {"debug.code",               {"0", ConfigType::Integer}},
-        {"debug.enable_send_data",   {"0", ConfigType::Boolean}}
+        {"debug.enable_send_data",   {"0", ConfigType::Boolean}},
+        {"sensor.return",   {"0", ConfigType::Integer}},
+        {"sensor.supply",   {"0", ConfigType::Integer}},
+        {"sensor.coil",   {"0", ConfigType::Integer}}
     };
 }
 
