@@ -17,6 +17,10 @@ public:
     bool save();
     bool resetToDefaults();
 
+    const std::map<std::string, ConfigEntry>& getSchema() const {
+        return validator_.getSchema();
+    }
+
 private:
     std::string filepath_;
     std::map<std::string, std::string> configValues_;
