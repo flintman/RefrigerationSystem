@@ -1,8 +1,6 @@
 #include "config_manager.h"
 #include "sensor_manager.h"
 #include "refrigeration.h"
-#include <iostream>
-
 
 void display_all_variables(){
     std::cout << "YOU NEED TO RUN config_editor to initalize the sensors.....\n\n\n\n";
@@ -22,10 +20,24 @@ void display_all_variables(){
     std::cout << "supply: " << cfg.get("sensor.supply") << "\n";
 }
 
+void update_sensor_thread(){
+    while (true) {
+        std::lock_guard<std::mutex> lock(mtx);
+        return_temp = sensors.readSensor(cfg.get("sensor.return"));
+        supply_temp = sensors.readSensor(cfg.get("sensor.supply"));
+        coil_temp = sensors.readSensor(cfg.get("sensor.coil"));
+        std::cout << "Return: " << return_temp << " Supply: " << supply_temp << " Coil: " << coil_temp << "\n";
+        std::this_thread::sleep_for(std::chrono::milliseconds(30000));
+    }
+}
 
 int main() {
+    std::thread sensor_thread(update_sensor_thread);
+
     if (cfg.get("sensor.return") == "0") {
         display_all_variables();
+    } else {
+        sensor_thread.join();
     }
 
     return 0;

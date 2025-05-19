@@ -4,6 +4,7 @@
 #include <dirent.h>
 #include <string>
 #include <vector>
+#include <cmath>
 
 SensorManager::SensorManager() {
 
@@ -16,11 +17,11 @@ float SensorManager::celsiusToFahrenheit(float celsius) {
 void SensorManager::readOneWireTempSensors() {
     const std::string baseDir = "/sys/bus/w1/devices/";
     const std::string sensorPrefix = "28-"; // Common prefix for DS18B20 sensors
-    
+
     // Open the directory
     DIR *dir;
     struct dirent *ent;
-    
+
     if ((dir = opendir(baseDir.c_str())) != nullptr) {
         // Read all files in directory
         while ((ent = readdir(dir)) != nullptr) {
@@ -45,8 +46,8 @@ void SensorManager::readOneWireTempSensors() {
                             float tempC = std::stof(tempStr) / 1000.0f;
                             float tempF = celsiusToFahrenheit(tempC);
                             // Display sensor name and temperature
-                            std::cout << "Sensor: " << name 
-                                      << " - Temperature: " << tempF 
+                            std::cout << "Sensor: " << name
+                                      << " - Temperature: " << tempF
                                       << "°F" << std::endl;
                         }
                     }
@@ -62,14 +63,14 @@ void SensorManager::readOneWireTempSensors() {
 
 float SensorManager::readSensor(const std::string& sensor_id) {
     const std::string sensor_path = "/sys/bus/w1/devices/" + sensor_id + "/w1_slave";
-    
+
     std::ifstream file(sensor_path);
     if (!file) {
         throw std::runtime_error("Failed to open sensor: " + sensor_id);
     }
 
     std::string line;
-    
+
     // First line - CRC check
     std::getline(file, line);
     if (line.find("YES") == std::string::npos) {
@@ -86,5 +87,6 @@ float SensorManager::readSensor(const std::string& sensor_id) {
     // Extract and convert temperature value
     float temp = std::stof(line.substr(pos + 2)) / 1000.0f;
     float tempF = celsiusToFahrenheit(temp);
+    tempF = std::round(tempF * 100.0f) / 100.0f;
     return tempF;
 }
