@@ -1,7 +1,7 @@
 // config_editor.cpp
 #include "config_manager.h"
 #include "config_validator.h"
-#include "refrigeration.h"
+#include "sensor_manager.h"
 #include <iostream>
 #include <iomanip>
 #include <termios.h>
@@ -19,6 +19,9 @@ public:
             
             int choice = getMenuChoice();
             if (choice == 0) {
+                if (confirmSave()) {
+                    manager.save();
+                }
                 break;
             }
             
@@ -30,6 +33,7 @@ public:
 
 private:
     ConfigManager manager;
+    SensorManager sensors;
 
     void clearScreen() {
         std::cout << "\033[2J\033[1;1H"; // ANSI escape codes
@@ -45,12 +49,13 @@ private:
                       << " (default: " << entry.defaultValue << ")\n";
         }
         std::cout << "\n";
+        sensors.readOneWireTempSensors();
     }
 
     void printMenu() {
         std::cout << "=== Menu ===\n";
         std::cout << "1-" << manager.getSchema().size() << ". Edit configuration item\n";
-        std::cout << "0. Exit\n\n";
+        std::cout << "0. Save and Exit\n\n";
         std::cout << "Enter your choice: ";
     }
 
@@ -88,9 +93,9 @@ private:
             }
         }
         
-        if (confirmSave()) {
-                manager.save();
-        }
+        std::cout << "Press Enter to continue...";
+        std::cin.ignore();
+        std::cin.get();
     }
 
     bool confirmSave() {
@@ -101,8 +106,13 @@ private:
     }
 };
 
-int main() {
-    ConfigEditor editor(config_file_name);
+int main(int argc, char* argv[]) {
+    if (argc != 2) {
+        std::cerr << "Usage: " << argv[0] << " <config_file_path>\n";
+        return 1;
+    }
+
+    ConfigEditor editor(argv[1]);
     editor.run();
     return 0;
 }

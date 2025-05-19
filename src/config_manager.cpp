@@ -43,7 +43,6 @@ bool ConfigManager::set(const std::string& key, const std::string& value) {
 
 bool ConfigManager::save() {
     saveToDotEnv();
-    loadFromDotEnv();
     return true;
 }
 

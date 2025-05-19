@@ -1,4 +1,5 @@
 #include "config_manager.h"
+#include "sensor_manager.h"
 #include "refrigeration.h"
 #include <iostream>
 
