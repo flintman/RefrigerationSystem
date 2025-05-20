@@ -67,6 +67,9 @@ std::string defrost_mode(){
 }
 
 void refrigeration_system(){
+    time_t current_time = time(NULL);
+    int off_timer_value = stoi(cfg.get("compressor.off_timer")) * 60;
+    int setpoint_offset = stoi(cfg.get("setpoint.offset"));
     std::lock_guard<std::mutex> lock(mtx);
     if(system_status == "Cooling"){ // Only check this if we are in cooling mode
         std::cout << "Inside Cooling" << "\n";
@@ -82,13 +85,11 @@ void refrigeration_system(){
     }
     if(system_status == "Null"){
         std::cout << "Inside Null" << "\n";
-        time_t current_time = time(NULL);
-        int off_timer_value = stoi(cfg.get("compressor.off_timer")) * 60;
         if (current_time - compressor_last_stop_time >= static_cast<time_t>(off_timer_value)) {
-            if(return_temp >= setpoint){
+            if(return_temp >= (setpoint + setpoint_offset)){
                 system_status = cooling_mode();
             }
-            if(return_temp <= setpoint){
+            if(return_temp <= (setpoint - setpoint_offset)){
                 system_status = heating_mode();
             }
             anti_timer = false;
