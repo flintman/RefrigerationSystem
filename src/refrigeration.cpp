@@ -46,6 +46,7 @@ void null_mode() {
     compressor_last_stop_time = time(NULL);
     logger.log_events("Debug", "Lasttime: " + compressor_last_stop_time);
     update_gpio_from_status();
+    logger.log_events("Debug", "System Status: " + status["status"]);
     return;
 }
 
@@ -56,6 +57,7 @@ void cooling_mode() {
     status["valve"] = "False";
     status["electric_heater"] = "False";
     update_gpio_from_status();
+    logger.log_events("Debug", "System Status: " + status["status"]);
     return;
 }
 
@@ -66,6 +68,7 @@ void heating_mode() {
     status["valve"] = "True";
     status["electric_heater"] = "True";
     update_gpio_from_status();
+    logger.log_events("Debug", "System Status: " + status["status"]);
     return;
 }
 
@@ -76,6 +79,7 @@ void defrost_mode() {
     status["valve"] = "True";
     status["electric_heater"] = "True";
     update_gpio_from_status();
+    logger.log_events("Debug", "System Status: " + status["status"]);
     return;
 }
 
@@ -92,19 +96,16 @@ void refrigeration_system(){
     int setpoint_offset = stoi(cfg.get("setpoint.offset"));
     std::lock_guard<std::mutex> lock(mtx);
     if(status["status"] == "Cooling"){ // Only check this if we are in cooling mode
-        logger.log_events("Debug", "Inside Cooling");
         if(return_temp <= setpoint){ //Checked if already cooling when should we stop
             null_mode();
         }
     }
     if(status["status"] == "Heating"){ // Only check this if we are in heating mode
-        logger.log_events("Debug", "Inside Heating");
         if(return_temp >= setpoint){ //Checked if already heating when should we stop
             null_mode();
         }
     }
     if(status["status"] == "Null"){
-        logger.log_events("Debug", "Inside Null");
         if (current_time - compressor_last_stop_time >= static_cast<time_t>(off_timer_value)) {
             if(return_temp >= (setpoint + setpoint_offset)){
                 cooling_mode();
@@ -119,7 +120,6 @@ void refrigeration_system(){
         }
     }
     mtx.unlock();
-    logger.log_events("Debug", "System Status: " + status["status"]);
     display_system();
 }
 
