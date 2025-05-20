@@ -1,9 +1,7 @@
-#include "config_manager.h"
-#include "sensor_manager.h"
 #include "refrigeration.h"
 
 void display_all_variables(){
-    std::cout << "YOU NEED TO RUN config_editor to initalize the sensors.....\n\n\n\n";
+    logger.log_events("Debug", "YOU NEED TO RUN config_editor to initalize the sensors");
     std::cout << "Logging Interval: " << cfg.get("logging.interval_sec") << " seconds\n";
     std::cout << "Log Retention Period: " << cfg.get("logging.retention_period") << " days\n";
     std::cout << "TRL Number: " << cfg.get("trl.number") << "\n";
@@ -27,7 +25,11 @@ void update_sensor_thread(){
         return_temp = sensors.readSensor(cfg.get("sensor.return"));
         supply_temp = sensors.readSensor(cfg.get("sensor.supply"));
         coil_temp = sensors.readSensor(cfg.get("sensor.coil"));
-        std::cout << "Return: " << return_temp << " Supply: " << supply_temp << " Coil: " << coil_temp << "Setpoint: "<< setpoint <<"\n";
+        time_t current_time = time(NULL);
+        if (current_time - last_log_timestamp >= static_cast<time_t>(log_interval)) {
+            logger.log_conditions(setpoint, return_temp, coil_temp, supply_temp, status);
+            last_log_timestamp = time(NULL);
+        }
         mtx.unlock();
         refrigeration_system();
         std::this_thread::sleep_for(std::chrono::milliseconds(2000));
@@ -35,35 +37,53 @@ void update_sensor_thread(){
     cleanup_all();
 }
 
-std::string null_mode(){
-    gpio.write("fan_pin", false);
-    gpio.write("compressor_pin", false);
-    gpio.write("valve_pin", false);
-    gpio.write("electric_heater_pin", false);
+void null_mode() {
+    status["status"] = "Null";
+    status["compressor"] = "False";
+    status["fan"] = "False";
+    status["valve"] = "False";
+    status["electric_heater"] = "False";
     compressor_last_stop_time = time(NULL);
-    std::cout << "Lasttime: " << compressor_last_stop_time << "\n";
-    return "Null";
+    logger.log_events("Debug", "Lasttime: " + compressor_last_stop_time);
+    update_gpio_from_status();
+    return;
 }
-std::string cooling_mode(){
-    gpio.write("fan_pin", true);
-    gpio.write("compressor_pin", true);
-    gpio.write("valve_pin", false);
-    gpio.write("electric_heater_pin", false);
-    return "Cooling";
+
+void cooling_mode() {
+    status["status"] = "Cooling";
+    status["compressor"] = "True";
+    status["fan"] = "True";
+    status["valve"] = "False";
+    status["electric_heater"] = "False";
+    update_gpio_from_status();
+    return;
 }
-std::string heating_mode(){
-    gpio.write("fan_pin", true);
-    gpio.write("compressor_pin", true);
-    gpio.write("valve_pin", true);
-    gpio.write("electric_heater_pin", true);
-    return "Heating";
+
+void heating_mode() {
+    status["status"] = "Heating";
+    status["compressor"] = "True";
+    status["fan"] = "True";
+    status["valve"] = "True";
+    status["electric_heater"] = "True";
+    update_gpio_from_status();
+    return;
 }
-std::string defrost_mode(){
-    gpio.write("fan_pin", false);
-    gpio.write("compressor_pin", true);
-    gpio.write("valve_pin", true);
-    gpio.write("electric_heater_pin", true);
-    return "Defrost";
+
+void defrost_mode() {
+    status["status"] = "Defrost";
+    status["compressor"] = "True";
+    status["fan"] = "False";
+    status["valve"] = "True";
+    status["electric_heater"] = "True";
+    update_gpio_from_status();
+    return;
+}
+
+void update_gpio_from_status() {
+    gpio.write("fan_pin", status["fan"] == "True");
+    gpio.write("compressor_pin", status["compressor"] == "True");
+    gpio.write("valve_pin", status["valve"] == "True");
+    gpio.write("electric_heater_pin", status["electric_heater"] == "True");
 }
 
 void refrigeration_system(){
@@ -71,41 +91,41 @@ void refrigeration_system(){
     int off_timer_value = stoi(cfg.get("compressor.off_timer")) * 60;
     int setpoint_offset = stoi(cfg.get("setpoint.offset"));
     std::lock_guard<std::mutex> lock(mtx);
-    if(system_status == "Cooling"){ // Only check this if we are in cooling mode
-        std::cout << "Inside Cooling" << "\n";
+    if(status["status"] == "Cooling"){ // Only check this if we are in cooling mode
+        logger.log_events("Debug", "Inside Cooling");
         if(return_temp <= setpoint){ //Checked if already cooling when should we stop
-            system_status = null_mode();
+            null_mode();
         }
     }
-    if(system_status == "Heating"){ // Only check this if we are in heating mode
-        std::cout << "Inside Heating" << "\n";
+    if(status["status"] == "Heating"){ // Only check this if we are in heating mode
+        logger.log_events("Debug", "Inside Heating");
         if(return_temp >= setpoint){ //Checked if already heating when should we stop
-            system_status = null_mode();
+            null_mode();
         }
     }
-    if(system_status == "Null"){
-        std::cout << "Inside Null" << "\n";
+    if(status["status"] == "Null"){
+        logger.log_events("Debug", "Inside Null");
         if (current_time - compressor_last_stop_time >= static_cast<time_t>(off_timer_value)) {
             if(return_temp >= (setpoint + setpoint_offset)){
-                system_status = cooling_mode();
+                cooling_mode();
             }
             if(return_temp <= (setpoint - setpoint_offset)){
-                system_status = heating_mode();
+                heating_mode();
             }
             anti_timer = false;
         } else {
-            std::cout << "Inside AntiCycle" << "\n";
+            logger.log_events("Debug", "Inside AntiCycle");
             anti_timer = true;
         }
     }
     mtx.unlock();
-    std::cout << "System Status: " << system_status << "\n";
+    logger.log_events("Debug", "System Status: " + status["status"]);
     display_system();
 }
 
 void display_system(){
     try {
-        display1.display("Status: " + system_status, 0);
+        display1.display("Status: " + status["status"], 0);
         std::stringstream ss;
         ss << "SP: " << setpoint << " RT: " << return_temp;
         std::string setpoint_string = ss.str();
@@ -117,10 +137,10 @@ void display_system(){
         display1.display(coil_temp_string, 2);
 
         //lcd2
-        display2.display("Status: " + system_status, 0);
+        display2.display("Status: " + status["status"], 0);
 
     } catch (const std::exception& e) {
-        std::cerr << "Error: " << e.what() << std::endl;
+        logger.log_events("Error", std::string("During display updating: ") + e.what());
         return;
     }
 }
@@ -133,7 +153,7 @@ void signalHandler(int signal) {
 
 void cleanup_all(){
     // Cleanup code when thread exits
-    std::cout << "Running Cleanup \n";
+    logger.log_events("Debug",  "Running Cleanup");
     display1.clear();
     display2.clear();
     display1.backlight(false);
@@ -145,7 +165,7 @@ void cleanup_all(){
         gpio.write("valve_pin", false);
         gpio.write("electric_heater_pin", false);
     } catch (const std::exception& e) {
-        std::cerr << "Error during GPIO cleanup: " << e.what() << std::endl;
+        logger.log_events("Error", std::string("During GPIO cleanup: ") + e.what());
     }
 }
 int main() {
@@ -155,6 +175,7 @@ int main() {
     std::cout << "Welcome to the Refrigeration system \n";
     std::cout << "The system is starting up please wait \n";
     std::cout << "Press Ctrl+C to exit gracefully\n";
+    logger.log_events("Debug", "System started up");
 
     try {
         std::thread sensor_thread(update_sensor_thread);
@@ -167,6 +188,7 @@ int main() {
         }
 
         cleanup_all();
+        logger.clear_old_logs(log_retention_period);
 
     } catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << std::endl;

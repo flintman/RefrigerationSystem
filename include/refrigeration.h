@@ -11,6 +11,10 @@
 #include <ctime>
 #include "lcd_manager.h"
 #include "gpio_manager.h"
+#include "config_manager.h"
+#include "sensor_manager.h"
+#include "log_manager.h"
+
 
 // Define variables
 std::string config_file_name = "config.env";
@@ -19,8 +23,18 @@ float supply_temp = -327.0;
 float coil_temp = -327.0;
 float setpoint = 55.0;
 std::string system_status = "Null";
-time_t compressor_last_stop_time = time(NULL);
+time_t compressor_last_stop_time = time(NULL) - 400;
+time_t last_log_timestamp = time(NULL) - 400;
 bool anti_timer = false;
+
+// Sets up the array for logging
+std::map<std::string, std::string> status = {
+    {"status", "Null"},
+    {"compressor", "False"},
+    {"fan", "False"},
+    {"valve", "False"},
+    {"electric_heater", "False"}
+};
 
 std::atomic<bool> running(true);
 
@@ -29,10 +43,17 @@ SensorManager sensors;
 std::mutex mtx;
 GpioManager gpio;
 
+// Setup Logging
+int debug = stoi(cfg.get("debug.code"));
+int log_retention_period = stoi(cfg.get("logging.retention_period"));
+int log_interval = stoi(cfg.get("logging.interval_sec"));
+Logger logger(debug);
+
 void refrigeration_system();
 void display_system();
 void gpio_system();
 void cleanup_all();
+void update_gpio_from_status();
 
 // Initialize multiplexer
 auto mux = std::make_shared<TCA9548A_SMBus>();

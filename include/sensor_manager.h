@@ -6,6 +6,7 @@
 #include <fstream>
 #include <string>
 
+
 using namespace std;
 
 // Define your sensor structure to hold the data
