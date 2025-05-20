@@ -8,6 +8,7 @@
 #include <chrono>
 #include <csignal>
 #include <atomic>
+#include <ctime>
 #include "lcd_manager.h"
 #include "gpio_manager.h"
 
@@ -18,6 +19,8 @@ float supply_temp = -327.0;
 float coil_temp = -327.0;
 float setpoint = 55.0;
 std::string system_status = "Null";
+time_t compressor_last_stop_time = time(NULL);
+bool anti_timer = false;
 
 std::atomic<bool> running(true);
 

@@ -40,6 +40,8 @@ std::string null_mode(){
     gpio.write("compressor_pin", false);
     gpio.write("valve_pin", false);
     gpio.write("electric_heater_pin", false);
+    compressor_last_stop_time = time(NULL);
+    std::cout << "Lasttime: " << compressor_last_stop_time << "\n";
     return "Null";
 }
 std::string cooling_mode(){
@@ -80,11 +82,19 @@ void refrigeration_system(){
     }
     if(system_status == "Null"){
         std::cout << "Inside Null" << "\n";
-        if(return_temp >= setpoint){
-            system_status = cooling_mode();
-        }
-        if(return_temp <= setpoint){
-            system_status = heating_mode();
+        time_t current_time = time(NULL);
+        int off_timer_value = stoi(cfg.get("compressor.off_timer")) * 60;
+        if (current_time - compressor_last_stop_time >= static_cast<time_t>(off_timer_value)) {
+            if(return_temp >= setpoint){
+                system_status = cooling_mode();
+            }
+            if(return_temp <= setpoint){
+                system_status = heating_mode();
+            }
+            anti_timer = false;
+        } else {
+            std::cout << "Inside AntiCycle" << "\n";
+            anti_timer = true;
         }
     }
     mtx.unlock();
