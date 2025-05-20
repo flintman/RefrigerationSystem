@@ -1,0 +1,44 @@
+## Refrigeration C-PLUS-PLUS
+## Version 1.0.0
+
+The is my software to control a refrigeration system with a raspberry pi.
+
+
+
+
+####### GPIO Pins used  #########
+Compressor Output : 17
+Fan output : 27
+3-way valve output : 22
+Electric Heat output : 23
+Alarm Button : 5
+Defrost Button : 25
+LED Lights : 18
+SDA : 2
+SDC : 3
+one-wire : 4
+
+
+######### Required Equipment ###########
+
+(1)ATS01N232LU  32Amp SoftStart   https://www.grainger.com/product/SCHNEIDER-ELECTRIC-Soft-Start-200-to-240V-AC-6VME1
+(1)ATS01N222LU  22Amp SoftStart   https://www.grainger.com/product/SCHNEIDER-ELECTRIC-Soft-Start-200-to-240V-AC-6VMD8
+(1)18Z758       Din Rail          https://www.grainger.com/product/Mounting-Track-DIN-Rail-Mounting-18Z758
+(1)             4 relay block     https://www.amazon.com/Electronics-Salon-Signal-Interface-Module-Version/dp/B00M7VX0CK/
+(1)             wiring            https://www.amazon.com/Conductor-Electrical-Stranded-Oxygen-Free-Automotive/dp/B0CNXGSXC2/
+(1)             24V Transformer   https://www.amazon.com/Transformer%EF%BC%8C-Secondary-Isolation-Transformers%EF%BC%8C24V-Transformer/dp/B0B8Z2XV7V/
+(1)             24V Pilot Sol
+(1)             32 amp breaker    https://www.amazon.com/KERWINN-Miniature-Magnetic-Disconnect-50A/dp/B0CN66C18J
+(1)             16 amp breaker    https://www.amazon.com/KERWINN-Miniature-Magnetic-Disconnect-50A/dp/B0CN65TYZH/
+
+
+(1)            Raspberry Pi       https://www.amazon.com/Raspberry-Quad-core-Bluetooth-onboard-Antenna/dp/B0CCRP85TR/
+(1)            Headers            https://www.amazon.com/Frienda-Break-Away-Connector-Compatible-Raspberry/dp/B083DYVWDN
+(1)            DS18B20 sensors    https://www.amazon.com/AILEWEI-DS18B20-Temperature-Stainless-Waterproof/dp/B0DK3HP3TV/
+(1)            Enclosure          https://www.amazon.com/Gratury-Stainless-Waterproof-Electrical-290%C3%97190%C3%97140mm/dp/B08282SQPT/
+(1)            17 pin connector   https://www.amazon.com/HangTon-Aviation-Circular-Connector-Automotive/dp/B0BN3ZD6DB/
+(1)            20 conductor       https://www.amazon.com/KWANGIL-20AWG-Conductor-Cable-UL2464/dp/B0CSCYYS2T/
+(1)            Weather connector
+(1)            ADS1115            https://www.amazon.com/Teyleten-Robot-Converter-Amplifier-Raspberry/dp/B0CNV9G4K1/
+(1)            TCA9548A           https://www.amazon.com/gp/product/B0BTH8GCSC/
+(1)            Weather Box Back   https://www.amazon.com/dp/B0CXN42RP3/

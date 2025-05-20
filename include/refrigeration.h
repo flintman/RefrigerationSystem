@@ -26,6 +26,7 @@ std::string system_status = "Null";
 time_t compressor_last_stop_time = time(NULL) - 400;
 time_t last_log_timestamp = time(NULL) - 400;
 bool anti_timer = false;
+std::string version = "1.0.0";
 
 // Sets up the array for logging
 std::map<std::string, std::string> status = {

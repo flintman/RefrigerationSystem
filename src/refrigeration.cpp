@@ -175,6 +175,7 @@ int main() {
     std::cout << "Welcome to the Refrigeration system \n";
     std::cout << "The system is starting up please wait \n";
     std::cout << "Press Ctrl+C to exit gracefully\n";
+    std::cout << "Version: " << version << "\n";
     logger.log_events("Debug", "System started up");
 
     try {
