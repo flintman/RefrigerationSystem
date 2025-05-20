@@ -7,6 +7,7 @@
 #include <thread>
 #include <chrono>
 #include "lcd_manager.h"
+#include "gpio_manager.h"
 
 // Define variables
 std::string config_file_name = "config.env";
@@ -19,9 +20,11 @@ std::string system_status = "Null";
 ConfigManager cfg(config_file_name);
 SensorManager sensors;
 std::mutex mtx;
+GpioManager gpio;
 
 void refrigeration_system();
 void display_system();
+void gpio_system();
 
 // Initialize multiplexer
 auto mux = std::make_shared<TCA9548A_SMBus>();

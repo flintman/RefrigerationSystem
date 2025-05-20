@@ -35,13 +35,32 @@ void update_sensor_thread(){
 }
 
 std::string null_mode(){
+    gpio.write("fan_pin", false);
+    gpio.write("compressor_pin", false);
+    gpio.write("valve_pin", false);
+    gpio.write("electric_heater_pin", false);
     return "Null";
 }
 std::string cooling_mode(){
+    gpio.write("fan_pin", true);
+    gpio.write("compressor_pin", true);
+    gpio.write("valve_pin", false);
+    gpio.write("electric_heater_pin", false);
     return "Cooling";
 }
 std::string heating_mode(){
+    gpio.write("fan_pin", true);
+    gpio.write("compressor_pin", true);
+    gpio.write("valve_pin", true);
+    gpio.write("electric_heater_pin", true);
     return "Heating";
+}
+std::string defrost_mode(){
+    gpio.write("fan_pin", false);
+    gpio.write("compressor_pin", true);
+    gpio.write("valve_pin", true);
+    gpio.write("electric_heater_pin", true);
+    return "Defrost";
 }
 
 void refrigeration_system(){
