@@ -22,16 +22,17 @@ void display_all_variables(){
 }
 
 void update_sensor_thread(){
-    while (true) {
+    while (running) {
         std::lock_guard<std::mutex> lock(mtx);
         return_temp = sensors.readSensor(cfg.get("sensor.return"));
         supply_temp = sensors.readSensor(cfg.get("sensor.supply"));
         coil_temp = sensors.readSensor(cfg.get("sensor.coil"));
         std::cout << "Return: " << return_temp << " Supply: " << supply_temp << " Coil: " << coil_temp << "Setpoint: "<< setpoint <<"\n";
-        mtx.unlock(); // Forgot to unlock it
+        mtx.unlock();
         refrigeration_system();
         std::this_thread::sleep_for(std::chrono::milliseconds(2000));
     }
+    cleanup_all();
 }
 
 std::string null_mode(){
@@ -113,15 +114,52 @@ void display_system(){
     }
 }
 
+void signalHandler(int signal) {
+    if (signal == SIGINT) {
+        running = false;
+    }
+}
+
+void cleanup_all(){
+    // Cleanup code when thread exits
+    std::cout << "Running Cleanup \n";
+    display1.clear();
+    display2.clear();
+    display1.backlight(false);
+    display2.backlight(false);
+
+    try {
+        gpio.write("fan_pin", false);
+        gpio.write("compressor_pin", false);
+        gpio.write("valve_pin", false);
+        gpio.write("electric_heater_pin", false);
+    } catch (const std::exception& e) {
+        std::cerr << "Error during GPIO cleanup: " << e.what() << std::endl;
+    }
+}
 int main() {
+    // Set up signal handler
+    std::signal(SIGINT, signalHandler);
+
     std::cout << "Welcome to the Refrigeration system \n";
     std::cout << "The system is starting up please wait \n";
-    std::thread sensor_thread(update_sensor_thread);
+    std::cout << "Press Ctrl+C to exit gracefully\n";
 
-    if (cfg.get("sensor.return") == "0") {
-        display_all_variables();
-    } else {
-        sensor_thread.join();
+    try {
+        std::thread sensor_thread(update_sensor_thread);
+
+        if (cfg.get("sensor.return") == "0") {
+            display_all_variables();
+        } else {
+            // Wait for the sensor thread to finish (which will happen when running becomes false)
+            sensor_thread.join();
+        }
+
+        cleanup_all();
+
+    } catch (const std::exception& e) {
+        std::cerr << "Error: " << e.what() << std::endl;
+        return 1;
     }
 
     return 0;
