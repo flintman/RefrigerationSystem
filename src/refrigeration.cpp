@@ -78,6 +78,7 @@ void defrost_mode() {
     status["fan"] = "False";
     status["valve"] = "True";
     status["electric_heater"] = "True";
+    defrost_start_time  = time(NULL);
     update_gpio_from_status();
     logger.log_events("Debug", "System Status: " + status["status"]);
     return;
@@ -94,17 +95,24 @@ void refrigeration_system(){
     time_t current_time = time(NULL);
     int off_timer_value = stoi(cfg.get("compressor.off_timer")) * 60;
     int setpoint_offset = stoi(cfg.get("setpoint.offset"));
+    int defrost_coil_temperature = stoi(cfg.get("defrost.coil_temperature"));
+    int defrost_timeout = stoi(cfg.get("defrost.timeout_mins")) * 60;
+    int defrost_intervals = (stoi(cfg.get("defrost.interval_hours")) * 60) * 60;
+
     std::lock_guard<std::mutex> lock(mtx);
+
     if(status["status"] == "Cooling"){ // Only check this if we are in cooling mode
         if(return_temp <= setpoint){ //Checked if already cooling when should we stop
             null_mode();
         }
     }
+
     if(status["status"] == "Heating"){ // Only check this if we are in heating mode
         if(return_temp >= setpoint){ //Checked if already heating when should we stop
             null_mode();
         }
     }
+
     if(status["status"] == "Null"){
         if (current_time - compressor_last_stop_time >= static_cast<time_t>(off_timer_value)) {
             if(return_temp >= (setpoint + setpoint_offset)){
@@ -119,6 +127,23 @@ void refrigeration_system(){
             anti_timer = true;
         }
     }
+
+    if(status["status"] == "Defrost"){
+        if ((coil_temp > defrost_coil_temperature) || ((current_time - defrost_last_time) < defrost_intervals)) {
+            null_mode();
+            defrost_last_time = time(NULL);
+        }
+    }
+
+    if (coil_temp < defrost_coil_temperature) { // Make sure we are under the coil temp
+        if(((current_time - defrost_last_time) > defrost_intervals) || trigger_defrost) { //Lets check how long since last or was it triggered
+            if (defrost_start_time == 0) { // Only trigger the mode if not already called.
+                trigger_defrost = false;
+                defrost_mode();
+            }
+        }
+    }
+
     mtx.unlock();
     display_system();
 }

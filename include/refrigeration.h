@@ -22,11 +22,13 @@ float return_temp = -327.0;
 float supply_temp = -327.0;
 float coil_temp = -327.0;
 float setpoint = 55.0;
-std::string system_status = "Null";
 time_t compressor_last_stop_time = time(NULL) - 400;
 time_t last_log_timestamp = time(NULL) - 400;
 bool anti_timer = false;
 std::string version = "1.0.0";
+bool trigger_defrost = false;
+time_t defrost_start_time = 0;
+time_t defrost_last_time = time(NULL);
 
 // Sets up the array for logging
 std::map<std::string, std::string> status = {
