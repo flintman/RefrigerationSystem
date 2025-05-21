@@ -6,13 +6,16 @@
 #include <linux/i2c-dev.h>
 #include <sys/ioctl.h>
 #include <fcntl.h>
+#include <array>
+#include <mutex>
+#include <memory>
 #include <unistd.h>
 
 class SMBusDevice {
 protected:
     int fd;
     uint8_t address;
-    
+
     void smbusWriteByte(uint8_t reg, uint8_t value);
     void smbusWriteBlock(uint8_t reg, const uint8_t* data, uint8_t length);
     
@@ -31,6 +34,8 @@ public:
 class LCD2004_SMBus : public SMBusDevice {
 private:
     std::shared_ptr<TCA9548A_SMBus> mux;
+    std::array<std::array<char, 20>, 4> currentLines;
+    std::mutex lcdMutex;
     uint8_t channel;
     bool backlightState;
     
@@ -42,7 +47,7 @@ private:
     
     void write4bits(uint8_t value);
     void send(uint8_t value, uint8_t mode);
-    
+
 public:
     LCD2004_SMBus(std::shared_ptr<TCA9548A_SMBus> multiplexer, 
                  uint8_t channel, 
