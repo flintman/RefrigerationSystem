@@ -87,6 +87,6 @@ float SensorManager::readSensor(const std::string& sensor_id) {
     // Extract and convert temperature value
     float temp = std::stof(line.substr(pos + 2)) / 1000.0f;
     float tempF = celsiusToFahrenheit(temp);
-    tempF = std::round(tempF * 100.0f) / 100.0f;
+    tempF = std::round(tempF * 10.0f) / 10.0f;
     return tempF;
 }
