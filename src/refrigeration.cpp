@@ -21,36 +21,38 @@ void display_all_variables(){
 
 void update_sensor_thread(){
     float setpoint_;
+    std::this_thread::sleep_for(std::chrono::milliseconds(2000)); // Lets make sure we are loaded up before moving on.
     while (running) {
-        {
-            std::lock_guard<std::mutex> setpoint_lock(setpoint_mutex);
-            setpoint_ = setpoint;
-            setpoint_mutex.unlock();
-        }
-        std::lock_guard<std::mutex> lock(mtx);
+        std::lock_guard<std::mutex> sensor_lock(sensor_mutex);
+
         return_temp = sensors.readSensor(cfg.get("sensor.return"));
         supply_temp = sensors.readSensor(cfg.get("sensor.supply"));
         coil_temp = sensors.readSensor(cfg.get("sensor.coil"));
+
         time_t current_time = time(NULL);
         if (current_time - last_log_timestamp >= static_cast<time_t>(log_interval)) {
-            logger.log_conditions(setpoint_, return_temp, coil_temp, supply_temp, status);
+            logger.log_conditions(setpoint, return_temp, coil_temp, supply_temp, status);
             last_log_timestamp = time(NULL);
         }
-        refrigeration_system(return_temp, supply_temp, coil_temp, setpoint_);
-        mtx.unlock();
+        refrigeration_system(return_temp, supply_temp, coil_temp, setpoint);
+        sensor_mutex.unlock();
         std::this_thread::sleep_for(std::chrono::milliseconds(1000));
     }
     cleanup_all();
 }
 
 void null_mode() {
-    std::lock_guard<std::mutex> setpoint_lock(status_mutex);
+    {
+        std::lock_guard<std::mutex> defrost_lock(refrigeration_mutex);
+        compressor_last_stop_time = time(NULL);
+        refrigeration_mutex.unlock();
+    }
+    std::lock_guard<std::mutex> status_lock(status_mutex);
     status["status"] = "Null";
     status["compressor"] = "False";
     status["fan"] = "True";
     status["valve"] = "False";
     status["electric_heater"] = "False";
-    compressor_last_stop_time = time(NULL);
     logger.log_events("Debug", "System Status: " + status["status"]);
     status_mutex.unlock();
     update_gpio_from_status();
@@ -58,7 +60,7 @@ void null_mode() {
 }
 
 void cooling_mode() {
-    std::lock_guard<std::mutex> setpoint_lock(status_mutex);
+    std::lock_guard<std::mutex> status_lock(status_mutex);
     status["status"] = "Cooling";
     status["compressor"] = "True";
     status["fan"] = "True";
@@ -71,7 +73,7 @@ void cooling_mode() {
 }
 
 void heating_mode() {
-    std::lock_guard<std::mutex> setpoint_lock(status_mutex);
+    std::lock_guard<std::mutex> status_lock(status_mutex);
     status["status"] = "Heating";
     status["compressor"] = "True";
     status["fan"] = "True";
@@ -84,13 +86,17 @@ void heating_mode() {
 }
 
 void defrost_mode() {
-    std::lock_guard<std::mutex> setpoint_lock(status_mutex);
+    {
+        std::lock_guard<std::mutex> defrost_lock(refrigeration_mutex);
+        defrost_start_time  = time(NULL);
+        refrigeration_mutex.unlock();
+    }
+    std::lock_guard<std::mutex> status_lock(status_mutex);
     status["status"] = "Defrost";
     status["compressor"] = "True";
     status["fan"] = "False";
     status["valve"] = "True";
     status["electric_heater"] = "True";
-    defrost_start_time  = time(NULL);
     logger.log_events("Debug", "System Status: " + status["status"]);
     status_mutex.unlock();
     update_gpio_from_status();
@@ -98,7 +104,7 @@ void defrost_mode() {
 }
 
 void update_gpio_from_status() {
-    std::lock_guard<std::mutex> setpoint_lock(status_mutex);
+    std::lock_guard<std::mutex> status_lock(status_mutex);
     gpio.write("fan_pin", status["fan"] == "False");
     gpio.write("compressor_pin", status["compressor"] == "False");
     gpio.write("valve_pin", status["valve"] == "False");
@@ -108,7 +114,6 @@ void update_gpio_from_status() {
 
 void refrigeration_system(float return_temp_, float supply_temp_, float coil_temp_, float setpoint_){
     std::string status_;
-    time_t compressor_last_stop_time_;
     time_t current_time = time(NULL);
     int off_timer_value = stoi(cfg.get("compressor.off_timer")) * 60;
     int setpoint_offset = stoi(cfg.get("setpoint.offset"));
@@ -116,9 +121,8 @@ void refrigeration_system(float return_temp_, float supply_temp_, float coil_tem
     int defrost_timeout = stoi(cfg.get("defrost.timeout_mins")) * 60;
     int defrost_intervals = (stoi(cfg.get("defrost.interval_hours")) * 60) * 60;
     {
-        std::lock_guard<std::mutex> lock(status_mutex);
+        std::lock_guard<std::mutex> status_lock(status_mutex);
         status_ = status["status"];
-        compressor_last_stop_time_ = compressor_last_stop_time;
         status_mutex.unlock();
     }
 
@@ -134,35 +138,42 @@ void refrigeration_system(float return_temp_, float supply_temp_, float coil_tem
         }
     }
 
+    std::lock_guard<std::mutex> defrost_lock(refrigeration_mutex);
     if(status_ == "Null"){
-        if (current_time - compressor_last_stop_time_ >= static_cast<time_t>(off_timer_value)) {
+        if (current_time - compressor_last_stop_time >= static_cast<time_t>(off_timer_value)) {
             if(return_temp_ >= (setpoint_ + setpoint_offset)){
                 cooling_mode();
             }
             if(return_temp_ <= (setpoint_ - setpoint_offset)){
                 heating_mode();
             }
+
             anti_timer = false;
         } else {
             logger.log_events("Debug", "Inside AntiCycle");
             anti_timer = true;
         }
     }
+    refrigeration_mutex.unlock();
 
     if(status_ == "Defrost"){
+        std::lock_guard<std::mutex> defrost_lock(refrigeration_mutex);
         if ((coil_temp_ > defrost_coil_temperature) || ((current_time - defrost_last_time) < defrost_intervals)) {
             null_mode();
             defrost_last_time = time(NULL);
         }
+        refrigeration_mutex.unlock();
     }
 
     if (coil_temp_ < defrost_coil_temperature) { // Make sure we are under the coil temp
+        std::lock_guard<std::mutex> defrost_lock(refrigeration_mutex);
         if(((current_time - defrost_last_time) > defrost_intervals) || trigger_defrost) { //Lets check how long since last or was it triggered
             if (defrost_start_time == 0) { // Only trigger the mode if not already called.
                 trigger_defrost = false;
                 defrost_mode();
             }
         }
+        refrigeration_mutex.unlock();
     }
 }
 
@@ -177,21 +188,17 @@ void display_system_thread(){
     while(running){
         // Lock and copy variables in separate scopes
         {
-            std::lock_guard<std::mutex> lock(mtx);
+            std::lock_guard<std::mutex> sensor_lock(sensor_mutex);
             return_temp_ = return_temp;
             supply_temp_ = supply_temp;
             coil_temp_ = coil_temp;
-            mtx.unlock();
+            setpoint_ = setpoint;
+            sensor_mutex.unlock();
         }
         {
-            std::lock_guard<std::mutex> setpoint_lock(status_mutex);
+            std::lock_guard<std::mutex> status_lock(status_mutex);
             status_ = status["status"];
             status_mutex.unlock();
-        }
-        {
-            std::lock_guard<std::mutex> setpoint_lock(setpoint_mutex);
-            setpoint_ = setpoint;
-            setpoint_mutex.unlock();
         }
 
         try {
@@ -246,13 +253,13 @@ void setpoint_system_thread(){
         }
         float setpoint_ = m * voltage + b;
 
-        std::lock_guard<std::mutex> lock(setpoint_mutex);
+        std::lock_guard<std::mutex> sensor_lock(sensor_mutex);
         setpoint = max(min_setpoint, min(max_setpoint, setpoint_));
         // Round to nearest tenth (one decimal place)
         setpoint = round(setpoint * 10.0f) / 10.0f;
 
-        logger.log_events("Debug", "Read Voltage: " + std::to_string(voltage) + " setpoint: " + std::to_string(setpoint) );
-        setpoint_mutex.unlock();
+        //logger.log_events("Debug", "Read Voltage: " + std::to_string(voltage) + " setpoint: " + std::to_string(setpoint) );
+        sensor_mutex.unlock();
         std::this_thread::sleep_for(std::chrono::milliseconds(200));
     }
 }
@@ -295,11 +302,11 @@ int main() {
         if (cfg.get("sensor.return") == "0") {
             display_all_variables();
         } else {
-            std::thread sensor_thread(update_sensor_thread);
+            std::thread refrigeration_thread(update_sensor_thread);
             std::thread setpoint_thread(setpoint_system_thread);
             std::thread display_system(display_system_thread);
             // Wait for the sensor thread to finish (which will happen when running becomes false)
-            sensor_thread.join();
+            refrigeration_thread.join();
             setpoint_thread.join();
             display_system.join();
             cleanup_all();

@@ -18,18 +18,18 @@
 
 
 // Define variables
-std::string config_file_name = "config.env";
-float return_temp = -327.0;
-float supply_temp = -327.0;
-float coil_temp = -327.0;
-std::atomic<float> setpoint = 55.0;
-time_t compressor_last_stop_time = time(NULL) - 400;
-time_t last_log_timestamp = time(NULL) - 400;
-bool anti_timer = false;
 std::string version = "1.0.0";
+std::string config_file_name = "config.env";
+
+time_t last_log_timestamp = time(NULL) - 400;
+
+// Refrigertion data
+std::mutex  refrigeration_mutex;
 bool trigger_defrost = false;
 time_t defrost_start_time = 0;
 time_t defrost_last_time = time(NULL);
+time_t compressor_last_stop_time = time(NULL) - 400;
+bool anti_timer = false;
 
 // Sets up the array for logging
 std::map<std::string, std::string> status = {
@@ -43,12 +43,17 @@ std::map<std::string, std::string> status = {
 std::atomic<bool> running(true);
 
 ConfigManager cfg(config_file_name);
-SensorManager sensors;
-std::mutex mtx;
-std::mutex setpoint_mutex;
 std::mutex status_mutex;
 GpioManager gpio;
 ADS1115 adc;
+
+// Setup Sensor data
+SensorManager sensors;
+float return_temp = -327.0;
+float supply_temp = -327.0;
+float coil_temp = -327.0;
+std::atomic<float> setpoint = 55.0;
+std::mutex sensor_mutex;
 
 // Setup Logging
 int debug = stoi(cfg.get("debug.code"));
@@ -56,6 +61,7 @@ int log_retention_period = stoi(cfg.get("logging.retention_period"));
 int log_interval = stoi(cfg.get("logging.interval_sec"));
 Logger logger(debug);
 
+// My Functions
 void refrigeration_system(float return_temp_, float supply_temp_, float coil_temp_, float setpoint_);
 void display_system();
 void gpio_system();
