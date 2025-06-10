@@ -288,6 +288,69 @@ void cleanup_all(){
     }
 }
 
+void ws8211_system_thread() {
+    std::string status_;
+    if (!ws2811.initialize()) {
+        logger.log_events("Error", "Failed to initialize WS2811 controller");
+        return;
+    }
+
+    bool wigwag_toggle = false;
+    auto last_wigwag_time = std::chrono::steady_clock::now();
+
+    while (running) {
+        {   std::lock_guard<std::mutex> status_lock(status_mutex);
+            status_ = status["status"];
+        } // lock_guard automatically unlocks here
+
+        try {
+            if (status_ == "Alarm") {
+                // Wigwag effect - alternate between LEDs
+                auto now = std::chrono::steady_clock::now();
+                if (now - last_wigwag_time >= std::chrono::milliseconds(250)) {
+                    wigwag_toggle = !wigwag_toggle;
+                    last_wigwag_time = now;
+                }
+
+                if (wigwag_toggle) {
+                    ws2811.setLED(0, 255, 0, 0);
+                    ws2811.setLED(1, 255, 255, 0);
+                } else {
+                    ws2811.setLED(0, 255, 255, 0);
+                    ws2811.setLED(1, 255, 0, 0);
+                }
+            } else {
+                // Normal operation
+                if (status_ == "Cooling") {
+                    ws2811.setLED(1, 0, 0, 255); // Blue
+                } else if (status_ == "Heating") {
+                    ws2811.setLED(1, 255, 0, 0); // Red
+                } else if (status_ == "Defrost") {
+                    ws2811.setLED(1, 255, 255, 0); // Yellow
+                } else {
+                    ws2811.setLED(1, 0, 0, 0); // Off
+                }
+
+                // LED 0 is green when not in alarm
+                ws2811.setLED(0, 0, 255, 0);
+            }
+
+            if (!ws2811.render()) {
+                logger.log_events("Error", "Failed to render WS2811 changes");
+                break;
+            }
+
+            std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        } catch (const std::exception& e) {
+            logger.log_events("Error", std::string("During WS2811 operation: ") + e.what());
+            break;
+        }
+    }
+    ws2811.clear();
+    ws2811.render();
+}
+
+
 int main() {
     // Set up signal handler
     std::signal(SIGINT, signalHandler);
@@ -305,6 +368,7 @@ int main() {
             std::thread refrigeration_thread(update_sensor_thread);
             std::thread setpoint_thread(setpoint_system_thread);
             std::thread display_system(display_system_thread);
+            std::thread ws8211_system(ws8211_system_thread);
             // Wait for the sensor thread to finish (which will happen when running becomes false)
             refrigeration_thread.join();
             setpoint_thread.join();

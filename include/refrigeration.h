@@ -15,6 +15,7 @@
 #include "sensor_manager.h"
 #include "log_manager.h"
 #include "ads1115.h"
+#include "WS2811Controller.h"
 
 
 // Define variables
@@ -46,6 +47,7 @@ ConfigManager cfg(config_file_name);
 std::mutex status_mutex;
 GpioManager gpio;
 ADS1115 adc;
+WS2811Controller ws2811(2, 18);
 
 // Setup Sensor data
 SensorManager sensors;
@@ -67,6 +69,10 @@ void display_system();
 void gpio_system();
 void cleanup_all();
 void update_gpio_from_status();
+void null_mode();
+void cooling_mode();
+void heating_mode();
+
 
 // Initialize multiplexer
 auto mux = std::make_shared<TCA9548A_SMBus>();
