@@ -1,14 +1,12 @@
-#ifndef REGFRIGERATION_H
-#define REGFRIGERATION_H
+#ifndef REFRIGERATION_H
+#define REFRIGERATION_H
 
 #include <string>
-#include <iostream>
+#include <map>
 #include <mutex>
-#include <thread>
-#include <chrono>
-#include <csignal>
 #include <atomic>
 #include <ctime>
+#include <memory>
 #include "lcd_manager.h"
 #include "gpio_manager.h"
 #include "config_manager.h"
@@ -16,24 +14,27 @@
 #include "log_manager.h"
 #include "ads1115.h"
 #include "WS2811Controller.h"
+#include "TCA9548A_SMBus.h"
 
+// Version and config
+inline const std::string version = "1.0.0";
+inline const std::string config_file_name = "config.env";
 
-// Define variables
-std::string version = "1.0.0";
-std::string config_file_name = "config.env";
+// Global state and synchronization
+inline std::atomic<bool> running{true};
+inline std::mutex refrigeration_mutex;
+inline std::mutex status_mutex;
+inline std::mutex sensor_mutex;
 
-time_t last_log_timestamp = time(NULL) - 400;
+// Refrigeration state
+inline bool trigger_defrost = false;
+inline time_t defrost_start_time = 0;
+inline time_t defrost_last_time = time(nullptr);
+inline time_t compressor_last_stop_time = time(nullptr) - 400;
+inline bool anti_timer = false;
 
-// Refrigertion data
-std::mutex  refrigeration_mutex;
-bool trigger_defrost = false;
-time_t defrost_start_time = 0;
-time_t defrost_last_time = time(NULL);
-time_t compressor_last_stop_time = time(NULL) - 400;
-bool anti_timer = false;
-
-// Sets up the array for logging
-std::map<std::string, std::string> status = {
+// Status map
+inline std::map<std::string, std::string> status = {
     {"status", "Null"},
     {"compressor", "False"},
     {"fan", "False"},
@@ -41,44 +42,39 @@ std::map<std::string, std::string> status = {
     {"electric_heater", "False"}
 };
 
-std::atomic<bool> running(true);
+// Managers and hardware
+inline ConfigManager cfg(config_file_name);
+inline GpioManager gpio;
+inline ADS1115 adc;
+inline WS2811Controller ws2811(2, 18);
+inline auto mux = std::make_shared<TCA9548A_SMBus>();
+inline LCD2004_SMBus display1(mux, 1);
+inline LCD2004_SMBus display2(mux, 2);
+inline SensorManager sensors;
+inline Logger logger(stoi(cfg.get("debug.code")));
 
-ConfigManager cfg(config_file_name);
-std::mutex status_mutex;
-GpioManager gpio;
-ADS1115 adc;
-WS2811Controller ws2811(2, 18);
+// Sensor data
+inline float return_temp = -327.0f;
+inline float supply_temp = -327.0f;
+inline float coil_temp = -327.0f;
+inline std::atomic<float> setpoint{55.0f};
 
-// Setup Sensor data
-SensorManager sensors;
-float return_temp = -327.0;
-float supply_temp = -327.0;
-float coil_temp = -327.0;
-std::atomic<float> setpoint = 55.0;
-std::mutex sensor_mutex;
+// Logging config
+inline int log_retention_period = stoi(cfg.get("logging.retention_period"));
+inline int log_interval = stoi(cfg.get("logging.interval_sec"));
 
-// Setup Logging
-int debug = stoi(cfg.get("debug.code"));
-int log_retention_period = stoi(cfg.get("logging.retention_period"));
-int log_interval = stoi(cfg.get("logging.interval_sec"));
-Logger logger(debug);
-
-// My Functions
+// Function declarations
 void refrigeration_system(float return_temp_, float supply_temp_, float coil_temp_, float setpoint_);
-void display_system();
-void gpio_system();
+void display_system_thread();
+void setpoint_system_thread();
 void cleanup_all();
 void update_gpio_from_status();
 void null_mode();
 void cooling_mode();
 void heating_mode();
+void defrost_mode();
+void display_all_variables();
+void ws8211_system_thread();
+void signalHandler(int signal);
 
-
-// Initialize multiplexer
-auto mux = std::make_shared<TCA9548A_SMBus>();
-
-// Create LCD instances
-LCD2004_SMBus display1(mux, 1); // Channel 1
-LCD2004_SMBus display2(mux, 2); // Channel 2
-
-#endif
+#endif // REFRIGERATION_H
