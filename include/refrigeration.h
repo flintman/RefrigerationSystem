@@ -14,7 +14,6 @@
 #include "log_manager.h"
 #include "ads1115.h"
 #include "WS2811Controller.h"
-#include "TCA9548A_SMBus.h"
 
 // Version and config
 inline const std::string version = "1.0.0";
@@ -22,16 +21,14 @@ inline const std::string config_file_name = "config.env";
 
 // Global state and synchronization
 inline std::atomic<bool> running{true};
-inline std::mutex refrigeration_mutex;
 inline std::mutex status_mutex;
-inline std::mutex sensor_mutex;
 
 // Refrigeration state
-inline bool trigger_defrost = false;
-inline time_t defrost_start_time = 0;
-inline time_t defrost_last_time = time(nullptr);
-inline time_t compressor_last_stop_time = time(nullptr) - 400;
-inline bool anti_timer = false;
+inline std::atomic<bool> trigger_defrost{false};
+inline std::atomic<time_t> defrost_start_time{0};
+inline std::atomic<time_t> defrost_last_time{time(nullptr)};
+inline std::atomic<time_t> compressor_last_stop_time{time(nullptr) - 400};
+inline std::atomic<bool> anti_timer{false};
 
 // Status map
 inline std::map<std::string, std::string> status = {
@@ -54,9 +51,9 @@ inline SensorManager sensors;
 inline Logger logger(stoi(cfg.get("debug.code")));
 
 // Sensor data
-inline float return_temp = -327.0f;
-inline float supply_temp = -327.0f;
-inline float coil_temp = -327.0f;
+inline std::atomic<float>  return_temp = -327.0f;
+inline std::atomic<float>  supply_temp = -327.0f;
+inline std::atomic<float> coil_temp = -327.0f;
 inline std::atomic<float> setpoint{55.0f};
 
 // Logging config

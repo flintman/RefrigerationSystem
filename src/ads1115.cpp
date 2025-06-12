@@ -56,7 +56,7 @@ float ADS1115::readVoltage(uint8_t channel) {
     uint16_t status;
     int attempts = 0;
     do {
-        usleep(1000);
+        usleep(100);
         status = readRegister(0x01);
         if (++attempts > 100) throw std::runtime_error("Conversion timeout");
     } while (!(status & 0x8000));

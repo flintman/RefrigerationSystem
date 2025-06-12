@@ -27,44 +27,36 @@ void display_all_variables() {
 
 void update_sensor_thread() {
     using namespace std::chrono;
-    std::this_thread::sleep_for(milliseconds(2000)); // Wait for system to load
+    std::this_thread::sleep_for(milliseconds(200)); // Wait for system to load
 
     auto last_log_time = steady_clock::now();
 
     while (running) {
         float local_return_temp, local_supply_temp, local_coil_temp, local_setpoint;
-
-        {
-            std::lock_guard<std::mutex> lock(sensor_mutex);
-            return_temp = sensors.readSensor(cfg.get("sensor.return"));
-            supply_temp = sensors.readSensor(cfg.get("sensor.supply"));
-            coil_temp   = sensors.readSensor(cfg.get("sensor.coil"));
-            local_return_temp = return_temp;
-            local_supply_temp = supply_temp;
-            local_coil_temp   = coil_temp;
-            local_setpoint    = setpoint.load();
-        }
+        return_temp = sensors.readSensor(cfg.get("sensor.return"));
+        supply_temp = sensors.readSensor(cfg.get("sensor.supply"));
+        coil_temp   = sensors.readSensor(cfg.get("sensor.coil"));
+        local_return_temp = return_temp;
+        local_supply_temp = supply_temp;
+        local_coil_temp   = coil_temp;
+        local_setpoint    = setpoint.load();
 
         refrigeration_system(local_return_temp, local_supply_temp, local_coil_temp, local_setpoint);
 
         auto now = steady_clock::now();
         if (duration_cast<seconds>(now - last_log_time).count() >= log_interval) {
-            std::lock_guard<std::mutex> lock(sensor_mutex);
+            std::lock_guard<std::mutex> lock(status_mutex);
             logger.log_conditions(setpoint, return_temp, coil_temp, supply_temp, status);
             last_log_time = now;
         }
 
-        for (int i = 0; i < 10 && running; ++i)
-            std::this_thread::sleep_for(milliseconds(100));
+        std::this_thread::sleep_for(milliseconds(100));
     }
     cleanup_all();
 }
 
 void null_mode() {
-    {
-        std::lock_guard<std::mutex> lock(refrigeration_mutex);
-        compressor_last_stop_time = time(nullptr);
-    }
+    compressor_last_stop_time = time(nullptr);
     {
         std::lock_guard<std::mutex> lock(status_mutex);
         status["status"] = "Null";
@@ -104,11 +96,9 @@ void heating_mode() {
 }
 
 void defrost_mode() {
-    {
-        std::lock_guard<std::mutex> lock(refrigeration_mutex);
-        defrost_start_time  = time(nullptr);
-    }
-    {
+    defrost_start_time  = time(nullptr);
+
+   {
         std::lock_guard<std::mutex> lock(status_mutex);
         status["status"] = "Defrost";
         status["compressor"] = "True";
@@ -151,7 +141,6 @@ void refrigeration_system(float return_temp_, float supply_temp_, float coil_tem
     }
 
     {
-        std::lock_guard<std::mutex> lock(refrigeration_mutex);
         if (status_ == "Null") {
             if (current_time - compressor_last_stop_time >= static_cast<time_t>(off_timer_value)) {
                 if (return_temp_ >= (setpoint_ + setpoint_offset)) {
@@ -169,7 +158,6 @@ void refrigeration_system(float return_temp_, float supply_temp_, float coil_tem
     }
 
     if (status_ == "Defrost") {
-        std::lock_guard<std::mutex> lock(refrigeration_mutex);
         if ((coil_temp_ > defrost_coil_temperature) || ((current_time - defrost_last_time) < defrost_intervals)) {
             null_mode();
             defrost_last_time = time(nullptr);
@@ -177,7 +165,6 @@ void refrigeration_system(float return_temp_, float supply_temp_, float coil_tem
     }
 
     if (coil_temp_ < defrost_coil_temperature) {
-        std::lock_guard<std::mutex> lock(refrigeration_mutex);
         if (((current_time - defrost_last_time) > defrost_intervals) || trigger_defrost) {
             if (defrost_start_time == 0) {
                 trigger_defrost = false;
@@ -195,13 +182,10 @@ void display_system_thread() {
     float setpoint_;
 
     while (running) {
-        {
-            std::lock_guard<std::mutex> lock(sensor_mutex);
-            return_temp_ = return_temp;
-            supply_temp_ = supply_temp;
-            coil_temp_ = coil_temp;
-            setpoint_ = setpoint.load();
-        }
+        return_temp_ = return_temp;
+        supply_temp_ = supply_temp;
+        coil_temp_ = coil_temp;
+        setpoint_ = setpoint.load();
         {
             std::lock_guard<std::mutex> lock(status_mutex);
             status_ = status["status"];
@@ -223,7 +207,7 @@ void display_system_thread() {
             logger.log_events("Error", std::string("During display updating: ") + e.what());
             return;
         }
-        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        std::this_thread::sleep_for(std::chrono::milliseconds(200));
     }
 }
 
@@ -256,35 +240,9 @@ void setpoint_system_thread() {
         }
         float setpoint_ = m * voltage + b;
 
-        {
-            std::lock_guard<std::mutex> lock(sensor_mutex);
-            setpoint = std::clamp(setpoint_, min_setpoint, max_setpoint);
-            setpoint = std::round(setpoint * 10.0f) / 10.0f;
-        }
+        setpoint = std::clamp(setpoint_, min_setpoint, max_setpoint);
+        setpoint = std::round(setpoint * 10.0f) / 10.0f;
         std::this_thread::sleep_for(std::chrono::milliseconds(200));
-    }
-}
-
-void signalHandler(int signal) {
-    if (signal == SIGINT) {
-        running = false;
-    }
-}
-
-void cleanup_all() {
-    logger.log_events("Debug", "Running Cleanup");
-    display1.clear();
-    display2.clear();
-    display1.backlight(false);
-    display2.backlight(false);
-
-    try {
-        gpio.write("fan_pin", false);
-        gpio.write("compressor_pin", false);
-        gpio.write("valve_pin", false);
-        gpio.write("electric_heater_pin", false);
-    } catch (const std::exception& e) {
-        logger.log_events("Error", std::string("During GPIO cleanup: ") + e.what());
     }
 }
 
@@ -323,13 +281,13 @@ void ws8211_system_thread() {
                 if (status_ == "Cooling") {
                     ws2811.setLED(1, 0, 0, 255); // Blue
                 } else if (status_ == "Heating") {
-                    ws2811.setLED(1, 255, 0, 0); // Red
+                    ws2811.setLED(1, 0, 255, 0); // Red
                 } else if (status_ == "Defrost") {
                     ws2811.setLED(1, 255, 255, 0); // Yellow
                 } else {
-                    ws2811.setLED(1, 0, 0, 0); // Off
+                    ws2811.setLED(1, 255, 255, 255); // Off
                 }
-                ws2811.setLED(0, 0, 255, 0); // Green when not in alarm
+                ws2811.setLED(0, 255, 0, 0); // Green when not in alarm
             }
 
             if (!ws2811.render()) {
@@ -337,7 +295,7 @@ void ws8211_system_thread() {
                 break;
             }
 
-            std::this_thread::sleep_for(std::chrono::milliseconds(50));
+            std::this_thread::sleep_for(std::chrono::milliseconds(200));
         } catch (const std::exception& e) {
             logger.log_events("Error", std::string("During WS2811 operation: ") + e.what());
             break;
@@ -345,6 +303,29 @@ void ws8211_system_thread() {
     }
     ws2811.clear();
     ws2811.render();
+}
+
+void signalHandler(int signal) {
+    if (signal == SIGINT) {
+        running = false;
+    }
+}
+
+void cleanup_all() {
+    logger.log_events("Debug", "Running Cleanup");
+    display1.clear();
+    display2.clear();
+    display1.backlight(false);
+    display2.backlight(false);
+
+    try {
+        gpio.write("fan_pin", false);
+        gpio.write("compressor_pin", false);
+        gpio.write("valve_pin", false);
+        gpio.write("electric_heater_pin", false);
+    } catch (const std::exception& e) {
+        logger.log_events("Error", std::string("During GPIO cleanup: ") + e.what());
+    }
 }
 
 int main() {

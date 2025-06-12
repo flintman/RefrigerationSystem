@@ -38,6 +38,12 @@ ALL_OBJS = $(TOOL_OBJS) $(OBJ_DIR)/config_manager.o $(OBJ_DIR)/config_validator.
 
 # Default target
 all: $(TARGET) $(TOOL_TARGET)
+	@echo "--------------------------------------------------------------------------------"
+	@echo ""
+	@echo "--------------------------------------------------------------------------------"
+	@echo "Build completed successfully!"
+	@echo "Main executable located at: $(abspath $(TARGET))"
+	@echo "Tool executable located at: $(abspath $(TOOL_TARGET))"
 
 # Linking
 $(TARGET): $(OBJS) $(VENDOR_OBJS)

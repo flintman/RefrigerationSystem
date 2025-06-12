@@ -9,7 +9,7 @@ SMBusDevice::SMBusDevice(const char* bus, uint8_t addr) : address(addr) {
     if ((fd = open(bus, O_RDWR)) < 0) {
         throw std::runtime_error("Failed to open I2C bus");
     }
-    
+
     if (ioctl(fd, I2C_SLAVE, address) < 0) {
         close(fd);
         throw std::runtime_error("Failed to acquire bus access");
@@ -46,7 +46,7 @@ TCA9548A_SMBus::TCA9548A_SMBus(const char* bus, uint8_t address)
 void TCA9548A_SMBus::selectChannel(uint8_t channel) {
     if (channel > 7) throw std::out_of_range("Channel must be 0-7");
     smbusWriteByte(0, 1 << channel);
-    usleep(1000);
+    usleep(200);
 }
 
 void TCA9548A_SMBus::disableAllChannels() {
@@ -60,7 +60,7 @@ LCD2004_SMBus::LCD2004_SMBus(std::shared_ptr<TCA9548A_SMBus> multiplexer,
     : SMBusDevice("/dev/i2c-1", address), mux(multiplexer), channel(ch), backlightState(true) {
 
     mux->selectChannel(channel);
-    usleep(50000);
+    usleep(5000);
 
     // Initialize LCD in 4-bit mode
     write4bits(0x03 << 4);
@@ -101,11 +101,11 @@ void LCD2004_SMBus::write4bits(uint8_t value) {
     uint8_t data[1];
     data[0] = value | LCD_ENABLE | (backlightState ? LCD_BACKLIGHT : 0);
     smbusWriteBlock(0, data, 1);
-    usleep(20);
+    usleep(10);
 
     data[0] = (value & ~LCD_ENABLE) | (backlightState ? LCD_BACKLIGHT : 0);
     smbusWriteBlock(0, data, 1);
-    usleep(20);
+    usleep(10);
 }
 
 void LCD2004_SMBus::send(uint8_t value, uint8_t mode) {
@@ -113,15 +113,15 @@ void LCD2004_SMBus::send(uint8_t value, uint8_t mode) {
     uint8_t lownib = (value << 4) & 0xF0;
 
     write4bits(highnib | mode);
-    usleep(10);
+    usleep(5);
     write4bits(lownib | mode);
-    usleep(10);
+    usleep(5);
 }
 
 void LCD2004_SMBus::clear() {
     mux->selectChannel(channel);
     send(0x01, LCD_CMD);
-    usleep(5000);
+    usleep(200);
 
     // Reset line buffers
     for (auto& line : currentLines) {
