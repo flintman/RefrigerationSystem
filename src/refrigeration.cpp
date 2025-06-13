@@ -216,9 +216,14 @@ void setpoint_system_thread() {
     constexpr float max_voltage = 3.28f;
     constexpr float min_setpoint = -20.0f;
     constexpr float max_setpoint = 80.0f;
+    float voltage = 0.0f;
 
     while (running) {
-        float voltage = adc.readVoltage(3);
+        try {
+            voltage = adc.readVoltage(3);
+        } catch (const std::exception& e) {
+            logger.log_events("Error", std::string("ADS1115 error: ") + e.what());
+        }
         if (!std::isfinite(voltage)) {
             logger.log_events("Error", "Invalid voltage reading!");
             continue;
