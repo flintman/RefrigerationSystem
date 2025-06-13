@@ -25,10 +25,12 @@ inline std::mutex status_mutex;
 
 // Refrigeration state
 inline std::atomic<bool> trigger_defrost{false};
-inline std::atomic<time_t> defrost_start_time{0};
+inline std::atomic<time_t> defrost_start_time = 0;
+inline std::atomic<time_t> defrost_button_press_start_time{0};
 inline std::atomic<time_t> defrost_last_time{time(nullptr)};
 inline std::atomic<time_t> compressor_last_stop_time{time(nullptr) - 400};
 inline std::atomic<bool> anti_timer{false};
+inline std::atomic<time_t> alarm_reset_button_press_start_time{0};
 
 // Status map
 inline std::map<std::string, std::string> status = {

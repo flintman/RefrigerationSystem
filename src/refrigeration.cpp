@@ -305,6 +305,65 @@ void ws8211_system_thread() {
     ws2811.render();
 }
 
+void checkDefrostPin() {
+    if (gpio.read("defrost_pin")) {
+        if (defrost_button_press_start_time == 0) {
+            logger.log_events("Debug", "Defrost Button Pushed");
+            defrost_button_press_start_time = std::chrono::duration<double>(std::chrono::system_clock::now().time_since_epoch()).count();
+        }
+    } else {
+        if (defrost_button_press_start_time != 0) {
+            double now = std::chrono::duration<double>(std::chrono::system_clock::now().time_since_epoch()).count();
+            double press_duration = now - defrost_button_press_start_time;
+            defrost_button_press_start_time = 0;
+
+            logger.log_events("Debug", "Defrost Button released in " + std::to_string(press_duration));
+
+            int setpoint_int = static_cast<int>(setpoint.load());
+            if (press_duration >= 5 && setpoint_int == 65) {
+                logger.log_events("Debug", "Entering Pretrip");
+            } else if (press_duration >= 5 && setpoint_int == 80) {
+                logger.log_events("Debug", "Leaving Demo Mode");
+            } else {
+                if (!trigger_defrost) {
+                    logger.log_events("Debug", "Defrost pin active");
+                    trigger_defrost = true;
+                }
+            }
+        }
+    }
+}
+void checkAlarmPin(){
+    if (gpio.read("alarm_pin")) {
+        if (alarm_reset_button_press_start_time == 0) {
+            logger.log_events("Debug", "Alarm Button Pushed");
+            alarm_reset_button_press_start_time = std::chrono::duration<double>(std::chrono::system_clock::now().time_since_epoch()).count();
+        } else {
+            double now = std::chrono::duration<double>(std::chrono::system_clock::now().time_since_epoch()).count();
+            double press_duration = now - alarm_reset_button_press_start_time;
+            if (press_duration >= 5) {
+                logger.log_events("Debug", "Alarm Reset ");
+            }
+        }
+    } else {
+        alarm_reset_button_press_start_time = 0;
+    }
+}
+
+void button_system_thread() {
+    while (running) {
+        try {
+            checkDefrostPin();
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            checkAlarmPin();
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        } catch (const std::exception& e) {
+            logger.log_events("Error", std::string("During button system thread: ") + e.what());
+            break;
+        }
+    }
+}
+
 void signalHandler(int signal) {
     if (signal == SIGINT) {
         running = false;
@@ -345,11 +404,13 @@ int main() {
             std::thread setpoint_thread(setpoint_system_thread);
             std::thread display_system(display_system_thread);
             std::thread ws8211_system(ws8211_system_thread);
+            std::thread button_system(button_system_thread);
 
             refrigeration_thread.join();
             setpoint_thread.join();
             display_system.join();
             ws8211_system.join();
+            button_system.join();
 
             cleanup_all();
             logger.clear_old_logs(log_retention_period);
