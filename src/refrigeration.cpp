@@ -29,10 +29,9 @@ void update_sensor_thread() {
     using namespace std::chrono;
     std::this_thread::sleep_for(milliseconds(200)); // Wait for system to load
 
-    auto last_log_time = steady_clock::now();
-
     while (running) {
         float local_return_temp, local_supply_temp, local_coil_temp, local_setpoint;
+        std::map<std::string, std::string> local_status;
         return_temp = sensors.readSensor(cfg.get("sensor.return"));
         supply_temp = sensors.readSensor(cfg.get("sensor.supply"));
         coil_temp   = sensors.readSensor(cfg.get("sensor.coil"));
@@ -41,18 +40,21 @@ void update_sensor_thread() {
         local_coil_temp   = coil_temp;
         local_setpoint    = setpoint.load();
 
+        {
+            std::lock_guard<std::mutex> lock(status_mutex);
+            local_status = status;
+        }
+
         refrigeration_system(local_return_temp, local_supply_temp, local_coil_temp, local_setpoint);
 
-        auto now = steady_clock::now();
-        if (duration_cast<seconds>(now - last_log_time).count() >= log_interval) {
-            std::lock_guard<std::mutex> lock(status_mutex);
-            logger.log_conditions(setpoint, return_temp, coil_temp, supply_temp, status);
-            last_log_time = now;
+        time_t current_time = time(nullptr);
+        if (current_time - last_log_timestamp >= static_cast<time_t>(log_interval)) {
+            logger.log_conditions(setpoint, return_temp, coil_temp, supply_temp, local_status);
+            last_log_timestamp = time(nullptr);
         }
 
         std::this_thread::sleep_for(milliseconds(100));
     }
-    cleanup_all();
 }
 
 void null_mode() {
