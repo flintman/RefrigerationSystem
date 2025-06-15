@@ -15,6 +15,7 @@
 #include "ads1115.h"
 #include "WS2811Controller.h"
 #include "wifi_manager.h"
+#include "alarm.h"
 
 // Version and config
 inline const std::string version = "1.0.0";
@@ -23,6 +24,10 @@ inline const std::string config_file_name = "config.env";
 // Global state and synchronization
 inline std::atomic<bool> running{true};
 inline std::mutex status_mutex;
+
+// Alarm state
+inline std::atomic<bool> isShutdownAlarm(false);
+inline std::atomic<bool> isWarningAlarm(false);
 
 // Refrigeration state
 inline std::atomic<bool> trigger_defrost{false};
@@ -53,6 +58,7 @@ inline LCD2004_SMBus display2(mux, 2);
 inline SensorManager sensors;
 inline Logger logger(stoi(cfg.get("debug.code")));
 inline WiFiManager wifi_manager;
+inline Alarm systemAlarm;
 
 // Sensor data
 inline std::atomic<float>  return_temp = -327.0f;

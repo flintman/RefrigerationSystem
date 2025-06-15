@@ -44,8 +44,9 @@ void update_sensor_thread() {
             std::lock_guard<std::mutex> lock(status_mutex);
             local_status = status;
         }
-
-        refrigeration_system(local_return_temp, local_supply_temp, local_coil_temp, local_setpoint);
+        if(!systemAlarm.getShutdownStatus()){
+            refrigeration_system(local_return_temp, local_supply_temp, local_coil_temp, local_setpoint);
+        }
 
         time_t current_time = time(nullptr);
         if (current_time - last_log_timestamp >= static_cast<time_t>(log_interval)) {
@@ -118,6 +119,19 @@ void defrost_mode() {
     update_gpio_from_status();
 }
 
+void alarm_mode() {
+    {
+        std::lock_guard<std::mutex> lock(status_mutex);
+        status["status"] = "Alarm";
+        status["compressor"] = "False";
+        status["fan"] = "False";
+        status["valve"] = "False";
+        status["electric_heater"] = "False";
+        logger.log_events("Debug", "System Status: " + status["status"]);
+    }
+    update_gpio_from_status();
+}
+
 void update_gpio_from_status() {
     std::lock_guard<std::mutex> lock(status_mutex);
     gpio.write("fan_pin", status["fan"] == "False");
@@ -134,6 +148,7 @@ void refrigeration_system(float return_temp_, float supply_temp_, float coil_tem
     int defrost_coil_temperature = stoi(cfg.get("defrost.coil_temperature"));
     int defrost_timeout = stoi(cfg.get("defrost.timeout_mins")) * 60;
     int defrost_intervals = (stoi(cfg.get("defrost.interval_hours")) * 60) * 60;
+    bool defrost_timed_out = false;
 
     {
         std::lock_guard<std::mutex> lock(status_mutex);
@@ -166,10 +181,17 @@ void refrigeration_system(float return_temp_, float supply_temp_, float coil_tem
     }
 
     if (status_ == "Defrost") {
-        if ((coil_temp_ > defrost_coil_temperature) || ((current_time - defrost_last_time) < defrost_intervals)) {
+        defrost_timed_out = (current_time - defrost_start_time) > defrost_timeout;
+        if ((coil_temp_ > defrost_coil_temperature) || defrost_timed_out) {
             null_mode();
             defrost_last_time = time(nullptr);
         }
+    }
+
+    if(defrost_timed_out){
+        systemAlarm.activateAlarm(0, "9001: Defrost timed out.");
+        systemAlarm.addAlarmCode(9001);
+        defrost_timed_out = false;
     }
 
     if (coil_temp_ < defrost_coil_temperature) {
@@ -209,6 +231,20 @@ void display_system_thread() {
             ss << "CT: " << coil_temp_ << " DT: " << supply_temp_;
             display1.display(ss.str(), 2);
 
+            // Display alarm codes if any
+            auto codes = systemAlarm.getAlarmCodes();
+            if (!codes.empty()) {
+                ss.str("");
+                ss << "Alarms: ";
+                for (int code : codes) {
+                    ss << code << " ";
+                }
+                display1.display(ss.str(), 3);
+            } else {
+                display1.display("Normal", 3);
+            }
+
+            ss.str("");
             display2.display("Status: " + status_, 0);
 
         } catch (const std::exception& e) {
@@ -290,11 +326,11 @@ void ws8211_system_thread() {
                 }
 
                 if (wigwag_toggle) {
-                    ws2811.setLED(0, 255, 0, 0);
+                    ws2811.setLED(0, 0, 255, 0);
                     ws2811.setLED(1, 255, 255, 0);
                 } else {
                     ws2811.setLED(0, 255, 255, 0);
-                    ws2811.setLED(1, 255, 0, 0);
+                    ws2811.setLED(1, 0, 255, 0);
                 }
             } else {
                 if (status_ == "Cooling") {
@@ -306,7 +342,11 @@ void ws8211_system_thread() {
                 } else {
                     ws2811.setLED(1, 255, 255, 255); // Off
                 }
-                ws2811.setLED(0, 255, 0, 0); // Green when not in alarm
+                if(!systemAlarm.getWarningStatus()) {
+                    ws2811.setLED(0, 255, 0, 0); // Green when not in alarm
+                } else {
+                    ws2811.setLED(0, 255, 255, 0); // Yellow when warning alarm
+                }
             }
 
             if (!ws2811.render()) {
@@ -362,6 +402,7 @@ void checkAlarmPin(){
             double press_duration = now - alarm_reset_button_press_start_time;
             if (press_duration >= 5) {
                 logger.log_events("Debug", "Alarm Reset ");
+                systemAlarm.resetAlarm();
             }
         }
     } else {
@@ -430,6 +471,36 @@ void hotspot_start() {
     }
 }
 
+void checkAlarms_system(){
+    std::string status_;
+    float return_temp_;
+    float supply_temp_;
+
+    while(running){
+        return_temp_ = return_temp;
+        supply_temp_ = supply_temp;
+        {
+            std::lock_guard<std::mutex> lock(status_mutex);
+            status_ = status["status"];
+        }
+        if (status_== "Cooling"){
+            systemAlarm.coolingAlarm(return_temp_, supply_temp_, 5.0f);
+        } else if(status_ == "Heating"){
+            systemAlarm.heatingAlarm(return_temp_, supply_temp_, 5.0f);
+        } else {
+            systemAlarm.clearTimers();
+        }
+        if (systemAlarm.getShutdownStatus()) {
+            alarm_mode();
+        } else {
+            if (status_ == "Alarm") {
+                null_mode();
+            }
+        }
+        std::this_thread::sleep_for(std::chrono::seconds(10));
+    }
+}
+
 void signalHandler(int signal) {
     if (signal == SIGINT) {
         running = false;
@@ -455,6 +526,7 @@ int main() {
             std::thread ws8211_system(ws8211_system_thread);
             std::thread button_system(button_system_thread);
             std::thread hotspot_system(hotspot_start);
+            std::thread alarm_system(checkAlarms_system);
 
             refrigeration_thread.join();
             setpoint_thread.join();
@@ -462,6 +534,7 @@ int main() {
             ws8211_system.join();
             button_system.join();
             hotspot_system.join();
+            alarm_system.join();
 
             logger.clear_old_logs(log_retention_period);
         }
