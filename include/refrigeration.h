@@ -14,6 +14,7 @@
 #include "log_manager.h"
 #include "ads1115.h"
 #include "WS2811Controller.h"
+#include "wifi_manager.h"
 
 // Version and config
 inline const std::string version = "1.0.0";
@@ -51,6 +52,7 @@ inline LCD2004_SMBus display1(mux, 1);
 inline LCD2004_SMBus display2(mux, 2);
 inline SensorManager sensors;
 inline Logger logger(stoi(cfg.get("debug.code")));
+inline WiFiManager wifi_manager;
 
 // Sensor data
 inline std::atomic<float>  return_temp = -327.0f;

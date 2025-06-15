@@ -383,6 +383,53 @@ void button_system_thread() {
     }
 }
 
+void hotspot_start() {
+    bool enable_hotspot_loop = false;
+    int enable_hotspot = stoi(cfg.get("wifi.enable_hotspot"));
+    std::string ssid = "CJJ-LEASING-" + cfg.get("trl.number");
+    if (enable_hotspot == 1) {
+        wifi_manager.set_credentials(ssid, "ThisIsMyPassword4646");
+        wifi_manager.start_hotspot();
+        logger.log_events("Debug", "Hotspot started. Checking for clients...");
+        enable_hotspot_loop = true;
+    }
+
+    int no_client_duration = 0;
+    const int check_interval = 10; // seconds
+    bool have_clients = false;
+
+    while (enable_hotspot_loop) {
+        auto clients = wifi_manager.check_hotspot_clients();
+        if (!clients.empty()) {
+            logger.log_events("Debug", "Clients connected to the hotspot. Waiting...");
+            no_client_duration = 0;
+            have_clients = true;
+        } else {
+            no_client_duration += check_interval;
+            have_clients = false;
+            logger.log_events("Debug", "No clients connected for " + std::to_string(no_client_duration) + " seconds.");
+
+            if (no_client_duration >= 120) {
+                logger.log_events("Debug", "No clients for 2 minutes. Stopping hotspot");
+                break;
+            }
+        }
+
+        // If Ctrl+C is pressed and no clients are connected, stop the hotspot
+        if (!running) {
+            logger.log_events("Debug", "HOTSPOT: Ctrl+C detected.");
+            break;
+        }
+
+        std::this_thread::sleep_for(std::chrono::seconds(check_interval));
+    }
+
+    if (enable_hotspot_loop && !have_clients) {
+        logger.log_events("Debug", "Stopping hotspot.");
+        wifi_manager.stop_hotspot();
+    }
+}
+
 void signalHandler(int signal) {
     if (signal == SIGINT) {
         running = false;
@@ -407,12 +454,14 @@ int main() {
             std::thread display_system(display_system_thread);
             std::thread ws8211_system(ws8211_system_thread);
             std::thread button_system(button_system_thread);
+            std::thread hotspot_system(hotspot_start);
 
             refrigeration_thread.join();
             setpoint_thread.join();
             display_system.join();
             ws8211_system.join();
             button_system.join();
+            hotspot_system.join();
 
             logger.clear_old_logs(log_retention_period);
         }
