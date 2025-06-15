@@ -55,6 +55,12 @@ void update_sensor_thread() {
 
         std::this_thread::sleep_for(milliseconds(100));
     }
+    gpio.write("fan_pin", true);
+    gpio.write("compressor_pin", true);
+    gpio.write("valve_pin", true);
+    gpio.write("electric_heater_pin", true);
+    std::this_thread::sleep_for(milliseconds(100)); // Give time for GPIO to settle
+    logger.log_events("Debug", "Sensor thread stopped");
 }
 
 void null_mode() {
@@ -211,6 +217,12 @@ void display_system_thread() {
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(200));
     }
+    display1.clear();
+    display2.clear();
+    display1.backlight(false);
+    display2.backlight(false);
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    logger.log_events("Debug", "Display system thread stopped");
 }
 
 void setpoint_system_thread() {
@@ -377,23 +389,6 @@ void signalHandler(int signal) {
     }
 }
 
-void cleanup_all() {
-    logger.log_events("Debug", "Running Cleanup");
-    display1.clear();
-    display2.clear();
-    display1.backlight(false);
-    display2.backlight(false);
-
-    try {
-        gpio.write("fan_pin", false);
-        gpio.write("compressor_pin", false);
-        gpio.write("valve_pin", false);
-        gpio.write("electric_heater_pin", false);
-    } catch (const std::exception& e) {
-        logger.log_events("Error", std::string("During GPIO cleanup: ") + e.what());
-    }
-}
-
 int main() {
     std::signal(SIGINT, signalHandler);
 
@@ -419,7 +414,6 @@ int main() {
             ws8211_system.join();
             button_system.join();
 
-            cleanup_all();
             logger.clear_old_logs(log_retention_period);
         }
     } catch (const std::exception& e) {
