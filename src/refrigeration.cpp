@@ -32,9 +32,18 @@ void update_sensor_thread() {
     while (running) {
         float local_return_temp, local_supply_temp, local_coil_temp, local_setpoint;
         std::map<std::string, std::string> local_status;
-        return_temp = sensors.readSensor(cfg.get("sensor.return"));
-        supply_temp = sensors.readSensor(cfg.get("sensor.supply"));
-        coil_temp   = sensors.readSensor(cfg.get("sensor.coil"));
+        if (demo_mode) {
+            demo.setStatus(status["status"]);
+            demo.setSetpoint(setpoint.load());
+            demo.update();
+            return_temp = std::round(demo.readReturnTemp() * 10.0f) / 10.0f;
+            supply_temp = std::round(demo.readSupplyTemp() * 10.0f) / 10.0f;
+            coil_temp   = std::round(demo.readCoilTemp()   * 10.0f) / 10.0f;
+        } else {
+            return_temp = sensors.readSensor(cfg.get("sensor.return"));
+            supply_temp = sensors.readSensor(cfg.get("sensor.supply"));
+            coil_temp   = sensors.readSensor(cfg.get("sensor.coil"));
+        }
         local_return_temp = return_temp;
         local_supply_temp = supply_temp;
         local_coil_temp   = coil_temp;
@@ -54,7 +63,7 @@ void update_sensor_thread() {
             last_log_timestamp = time(nullptr);
         }
 
-        std::this_thread::sleep_for(milliseconds(100));
+        std::this_thread::sleep_for(milliseconds(1000));
     }
     gpio.write("fan_pin", true);
     gpio.write("compressor_pin", true);
@@ -163,17 +172,17 @@ void refrigeration_system(float return_temp_, float supply_temp_, float coil_tem
         null_mode();
     }
 
-    {
-        if (status_ == "Null") {
-            if (current_time - compressor_last_stop_time >= static_cast<time_t>(off_timer_value)) {
-                if (return_temp_ >= (setpoint_ + setpoint_offset)) {
-                    cooling_mode();
-                }
-                if (return_temp_ <= (setpoint_ - setpoint_offset)) {
-                    heating_mode();
-                }
-                anti_timer = false;
-            } else {
+    if (status_ == "Null") {
+        if (current_time - compressor_last_stop_time >= static_cast<time_t>(off_timer_value)) {
+            if (return_temp_ >= (setpoint_ + setpoint_offset)) {
+                cooling_mode();
+            }
+            if (return_temp_ <= (setpoint_ - setpoint_offset)) {
+                heating_mode();
+            }
+            anti_timer = false;
+        } else {
+            if(!anti_timer) {
                 logger.log_events("Debug", "Inside AntiCycle");
                 anti_timer = true;
             }
@@ -197,11 +206,11 @@ void refrigeration_system(float return_temp_, float supply_temp_, float coil_tem
     if (coil_temp_ < defrost_coil_temperature) {
         if (((current_time - defrost_last_time) > defrost_intervals) || trigger_defrost) {
             if (defrost_start_time == 0) {
-                trigger_defrost = false;
                 defrost_mode();
             }
         }
     }
+    trigger_defrost = false;
 }
 
 void display_system_thread() {
@@ -251,7 +260,7 @@ void display_system_thread() {
             logger.log_events("Error", std::string("During display updating: ") + e.what());
             return;
         }
-        std::this_thread::sleep_for(std::chrono::milliseconds(200));
+        std::this_thread::sleep_for(std::chrono::milliseconds(500));
     }
     display1.clear();
     display2.clear();
@@ -296,7 +305,7 @@ void setpoint_system_thread() {
         float setpoint_ = m * voltage + b;
 
         setpoint = std::clamp(setpoint_, min_setpoint, max_setpoint);
-        setpoint = std::round(setpoint * 10.0f) / 10.0f;
+        setpoint = std::round(setpoint * 1.0f) / 1.0f;
         std::this_thread::sleep_for(std::chrono::milliseconds(200));
     }
 }
@@ -382,7 +391,13 @@ void checkDefrostPin() {
             if (press_duration >= 5 && setpoint_int == 65) {
                 logger.log_events("Debug", "Entering Pretrip");
             } else if (press_duration >= 5 && setpoint_int == 80) {
-                logger.log_events("Debug", "Leaving Demo Mode");
+                if (demo_mode) {
+                    demo_mode = false;
+                    logger.log_events("Debug", "Leaving Demo Mode");
+                } else {
+                    demo_mode = true;
+                    logger.log_events("Debug", "Entering Demo Mode");
+                }
             } else {
                 if (!trigger_defrost) {
                     logger.log_events("Debug", "Defrost pin active");
@@ -507,8 +522,16 @@ void signalHandler(int signal) {
     }
 }
 
-int main() {
+int main(int argc, char* argv[]) {
     std::signal(SIGINT, signalHandler);
+
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        if (arg == "demo_mode=true" || arg == "--demo" || arg == "-d") {
+            demo_mode = true;
+            std::cout << "Demo mode enabled!\n";
+        }
+    }
 
     std::cout << "Welcome to the Refrigeration system \n";
     std::cout << "The system is starting up please wait \n";

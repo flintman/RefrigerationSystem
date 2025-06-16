@@ -16,6 +16,7 @@
 #include "WS2811Controller.h"
 #include "wifi_manager.h"
 #include "alarm.h"
+#include "demo_refrigeration.h"
 
 // Version and config
 inline const std::string version = "1.0.0";
@@ -30,6 +31,7 @@ inline std::atomic<bool> isShutdownAlarm(false);
 inline std::atomic<bool> isWarningAlarm(false);
 
 // Refrigeration state
+inline std::atomic<bool> demo_mode(false);
 inline std::atomic<bool> trigger_defrost{false};
 inline std::atomic<time_t> defrost_start_time = 0;
 inline std::atomic<time_t> defrost_button_press_start_time{0};
@@ -59,6 +61,7 @@ inline SensorManager sensors;
 inline Logger logger(stoi(cfg.get("debug.code")));
 inline WiFiManager wifi_manager;
 inline Alarm systemAlarm;
+DemoRefrigeration demo;
 
 // Sensor data
 inline std::atomic<float>  return_temp = -327.0f;
