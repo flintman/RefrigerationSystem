@@ -194,6 +194,7 @@ void refrigeration_system(float return_temp_, float supply_temp_, float coil_tem
         if ((coil_temp_ > defrost_coil_temperature) || defrost_timed_out) {
             null_mode();
             defrost_last_time = time(nullptr);
+            defrost_start_time = 0;
         }
     }
 
