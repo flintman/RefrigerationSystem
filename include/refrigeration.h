@@ -17,6 +17,7 @@
 #include "wifi_manager.h"
 #include "alarm.h"
 #include "demo_refrigeration.h"
+#include "secure_client.h"
 
 // Version and config
 inline const std::string version = "1.0.0";
@@ -61,7 +62,8 @@ inline SensorManager sensors;
 inline Logger logger(stoi(cfg.get("debug.code")));
 inline WiFiManager wifi_manager;
 inline Alarm systemAlarm;
-DemoRefrigeration demo;
+inline DemoRefrigeration demo;
+inline SecureClient secure_client;
 
 // Sensor data
 inline std::atomic<float>  return_temp = -327.0f;
@@ -87,5 +89,6 @@ void defrost_mode();
 void display_all_variables();
 void ws8211_system_thread();
 void signalHandler(int signal);
+void interruptible_sleep(int total_seconds);
 
 #endif // REFRIGERATION_H

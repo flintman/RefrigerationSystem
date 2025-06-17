@@ -4,9 +4,9 @@ ARCH = arm-linux-gnueabihf
 # Compiler and flags
 CXX = $(CROSS_PREFIX)g++
 CC = $(CROSS_PREFIX)gcc
-CXXFLAGS = -std=c++17 -Wall -g -Iinclude -I$(ARCH)/include -Ivendor/ws2811 -mfpu=neon-vfpv4 -march=armv7-a -mtune=cortex-a7
-CFLAGS = -Wall -g -Iinclude -Ivendor/ws2811 -mfpu=neon-vfpv4 -march=armv7-a -mtune=cortex-a7
-LDFLAGS = -L$(ARCH)/lib -Wl,-rpath=$(ARCH)/lib -static-libstdc++ -static-libgcc
+CXXFLAGS = -std=c++17 -Wall -g -Iinclude -I$(ARCH)/include -Ivendor/ws2811 -Ivendor/openssl/include -mfpu=neon-vfpv4 -march=armv7-a -mtune=cortex-a7
+CFLAGS = -Wall -g -Iinclude -Ivendor/ws2811 -Ivendor/openssl/include -mfpu=neon-vfpv4 -march=armv7-a -mtune=cortex-a7
+LDFLAGS = -L$(ARCH)/lib -Lvendor/openssl/lib -Wl,-rpath=$(ARCH)/lib -Wl,-rpath=vendor/openssl/lib -static-libstdc++ -static-libgcc
 LDFLAGS += -static -lm
 
 # Directories
@@ -48,7 +48,7 @@ all: $(TARGET) $(TOOL_TARGET)
 # Linking
 $(TARGET): $(OBJS) $(VENDOR_OBJS)
 	@mkdir -p $(BIN_DIR)
-	$(CXX) $(LDFLAGS) -o $@ $^
+	$(CXX) $(LDFLAGS) -o $@ $^ -lssl -lcrypto
 
 $(TOOL_TARGET): $(ALL_OBJS)
 	@mkdir -p $(BIN_DIR)

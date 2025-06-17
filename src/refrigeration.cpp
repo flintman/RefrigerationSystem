@@ -516,6 +516,109 @@ void checkAlarms_system(){
     }
 }
 
+void secureclient_loop() {
+    float return_temp_;
+    float supply_temp_;
+    float coil_temp_;
+    std::string status_;
+    std::string status_compresor;
+    std::string status_fan;
+    std::string status_valve;
+    std::string status_electric_heater;
+    float setpoint_;
+    using namespace std::chrono_literals;
+    std::this_thread::sleep_for(std::chrono::seconds(10));
+
+    while (running) {
+        int secureclient_timer = 900;
+        std::map<std::string, std::string> command;
+        return_temp_ = return_temp;
+        supply_temp_ = supply_temp;
+        coil_temp_ = coil_temp;
+        setpoint_ = setpoint.load();
+        {
+            std::lock_guard<std::mutex> lock(status_mutex);
+            status_ = status["status"];
+            status_compresor = status["compressor"];
+            status_fan = status["fan"];
+            status_valve = status["valve"];
+            status_electric_heater = status["electric_heater"];
+        }
+
+        try {
+            if (cfg.get("debug.enable_send_data") == "1") {
+                // Get timestamp
+                auto now = std::chrono::system_clock::now();
+                std::time_t now_c = std::chrono::system_clock::to_time_t(now);
+                char timestamp[32];
+                std::strftime(timestamp, sizeof(timestamp), "%H:%M:%S  %m:%d:%Y", std::localtime(&now_c));
+
+                // Convert alarm codes to comma-separated string
+                std::string alarm_codes_str;
+                auto codes = systemAlarm.getAlarmCodes();
+                for (size_t i = 0; i < codes.size(); ++i) {
+                    alarm_codes_str += std::to_string(codes[i]);
+                    if (i != codes.size() - 1) alarm_codes_str += ",";
+                }
+
+                std::ostringstream setpoint_ss, return_ss, supply_ss, coil_ss;
+                setpoint_ss << std::fixed << std::setprecision(0) << setpoint_;
+                return_ss   << std::fixed << std::setprecision(1) << return_temp_;
+                supply_ss   << std::fixed << std::setprecision(1) << supply_temp_;
+                coil_ss     << std::fixed << std::setprecision(1) << coil_temp_;
+
+                std::map<std::string, std::string> array = {
+                    {"timestamp", timestamp},
+                    {"trl", cfg.get("trl.number")},
+                    {"alarm_codes", alarm_codes_str},
+                    {"setpoint", setpoint_ss.str()},
+                    {"status", status_},
+                    {"compressor", status_compresor},
+                    {"fan", status_fan},
+                    {"valve", status_valve},
+                    {"electric_heater", status_electric_heater},
+                    {"return_temp", return_ss.str()},
+                    {"supply_temp", supply_ss.str()},
+                    {"coil_temp", coil_ss.str()}
+                };
+
+                if (wifi_manager.is_connected()) {
+                    try {
+                        secure_client.connect();
+                        command = secure_client.send_and_receive(array);
+                        logger.log_events("Debug", "Sent data, response received.");
+                    } catch (const std::exception& e) {
+                        logger.log_events("Error", std::string("Error in send/receive: ") + e.what());
+                    }
+                } else {
+                    logger.log_events("Debug", "No active internet connection. Function execution skipped.");
+                }
+            }
+        } catch (const std::exception& e) {
+            logger.log_events("Error", std::string("secureclient_loop encountered an error: ") + e.what());
+        }
+
+        // Handle command
+        if (!command.empty()) {
+            if (command["status"] == "alarm_reset") {
+                systemAlarm.resetAlarm();
+                secureclient_timer = 5;
+            } else if (command["status"] == "defrost") {
+                trigger_defrost = true;
+                secureclient_timer = 5;
+            }
+        }
+
+        interruptible_sleep(secureclient_timer);
+    }
+}
+
+void interruptible_sleep(int total_seconds) {
+    for (int i = 0; i < total_seconds && running; ++i) {
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+    }
+}
+
 void signalHandler(int signal) {
     if (signal == SIGINT) {
         running = false;
@@ -550,6 +653,7 @@ int main(int argc, char* argv[]) {
             std::thread button_system(button_system_thread);
             std::thread hotspot_system(hotspot_start);
             std::thread alarm_system(checkAlarms_system);
+            std::thread secureclient_system(secureclient_loop);
 
             refrigeration_thread.join();
             setpoint_thread.join();
@@ -558,6 +662,7 @@ int main(int argc, char* argv[]) {
             button_system.join();
             hotspot_system.join();
             alarm_system.join();
+            secureclient_system.join();
 
             logger.clear_old_logs(log_retention_period);
         }
