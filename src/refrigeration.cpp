@@ -554,11 +554,11 @@ void secureclient_loop() {
                 std::strftime(timestamp, sizeof(timestamp), "%H:%M:%S  %m:%d:%Y", std::localtime(&now_c));
 
                 // Convert alarm codes to comma-separated string
-                std::string alarm_codes_str;
                 auto codes = systemAlarm.getAlarmCodes();
+                std::ostringstream codes_ss;
                 for (size_t i = 0; i < codes.size(); ++i) {
-                    alarm_codes_str += std::to_string(codes[i]);
-                    if (i != codes.size() - 1) alarm_codes_str += ",";
+                    codes_ss << codes[i];
+                    if (i + 1 < codes.size()) codes_ss << ",";
                 }
 
                 std::ostringstream setpoint_ss, return_ss, supply_ss, coil_ss;
@@ -570,7 +570,7 @@ void secureclient_loop() {
                 std::map<std::string, std::string> array = {
                     {"timestamp", timestamp},
                     {"trl", cfg.get("trl.number")},
-                    {"alarm_codes", alarm_codes_str},
+                    {"alarm_codes", codes_ss.str()},
                     {"setpoint", setpoint_ss.str()},
                     {"status", status_},
                     {"compressor", status_compresor},
@@ -607,6 +607,7 @@ void secureclient_loop() {
                 trigger_defrost = true;
                 secureclient_timer = 5;
             }
+            interruptible_sleep(5);
         }
 
         interruptible_sleep(secureclient_timer);
