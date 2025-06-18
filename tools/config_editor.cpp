@@ -54,8 +54,11 @@ private:
                       << " = " << manager.get(key)
                       << " (default: " << entry.defaultValue << ")\n";
         }
-        std::cout << "\n";
+        std::cout << "\n\n";
+
+        std::cout << "=== Temp Sensors ===\n";
         sensors.readOneWireTempSensors();
+        std::cout << "\n\n";
     }
 
     void printMenu() {
