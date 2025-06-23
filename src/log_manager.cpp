@@ -79,7 +79,7 @@ void Logger::log_conditions(float setpoint, float return_sensor, float coil_sens
                      << "Valve: " << systems_status.at("valve") << ", "
                      << "Electric_heater: " << (systems_status.count("electric_heater") ? systems_status.at("electric_heater") : "N/A")
                      << "\n";
-            std::cout << "(" << get_current_datetime() << ") " << ": "
+            std::cout << "(" << get_current_datetime() << ") " << "Log_condition: "
                      << "Setpoint: " << setpoint << ", Return Sensor: " << return_sensor << ", "
                      << "Coil Sensor: " << coil_sensor << ", Supply: " << supply_sensor << ", "
                      << "Status: " << systems_status.at("status") << ", "

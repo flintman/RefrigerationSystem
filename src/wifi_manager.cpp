@@ -1,4 +1,5 @@
 #include "wifi_manager.h"
+#include "refrigeration.h"
 #include <cstdlib>
 #include <cstring>
 #include <sstream>
@@ -51,7 +52,7 @@ bool WiFiManager::start_hotspot() {
 
     // Create the virtual interface
     if (!run_command("sudo iw dev " + client_interface + " interface add " + hotspot_interface + " type __ap")) {
-        std::cerr << "Failed to create virtual interface\n";
+        logger.log_events("Error",  "Failed to create virtual interface");
         return false;
     }
     sleep(2);
@@ -62,7 +63,7 @@ bool WiFiManager::start_hotspot() {
        << " con-name MyHotspot autoconnect no ssid " << ssid
        << " 802-11-wireless.mode ap ipv4.method shared";
     if (!run_command(ss.str())) {
-        std::cerr << "Failed to add hotspot connection\n";
+        logger.log_events("Error", "Failed to add hotspot connection");
         run_command("sudo iw dev " + hotspot_interface + " del");
         return false;
     }
@@ -72,7 +73,7 @@ bool WiFiManager::start_hotspot() {
        << "802-11-wireless-security.key-mgmt wpa-psk "
        << "802-11-wireless-security.psk " << password;
     if (!run_command(ss.str())) {
-        std::cerr << "Failed to modify hotspot security\n";
+        logger.log_events("Error", "Failed to modify hotspot security");
         run_command("sudo iw dev " + hotspot_interface + " del");
         run_command("nmcli connection delete MyHotspot");
         return false;
@@ -87,7 +88,7 @@ bool WiFiManager::start_hotspot() {
         return false;
     }
 
-    std::cout << "Hotspot started successfully\n";
+    logger.log_events("Debug", "Hotspot started successfully");
     return true;
 }
 
@@ -102,7 +103,7 @@ bool WiFiManager::stop_hotspot() {
     if (is_interface_exist(hotspot_interface))
         run_command("sudo iw dev " + hotspot_interface + " del");
 
-    std::cout << "Hotspot stopped successfully\n";
+    logger.log_events("Debug", "Hotspot stopped successfully");
     return true;
 }
 
@@ -160,5 +161,5 @@ bool WiFiManager::is_connected(const std::string& host, int port, int timeout) {
 void WiFiManager::set_credentials(const std::string& new_ssid, const std::string& new_password) {
     ssid = new_ssid;
     password = new_password;
-    std::cout << "Hotspot credntials updated" + std::string("SSID: ") + ssid + ", Password: " + password << std::endl;
+    logger.log_events("Debug", "Hotspot credntials updated" + std::string("SSID: ") + ssid + ", Password: " + password);
 }

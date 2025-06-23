@@ -1,4 +1,5 @@
 #include "alarm.h"
+#include "refrigeration.h"
 #include <iostream>
 
 Alarm::Alarm() :
@@ -58,7 +59,7 @@ void Alarm::heatingAlarm(float returnTemp, float supplyTemp, float offsetTemp) {
 }
 
 void Alarm::activateAlarm(int alarmType, const std::string& message) {
-    std::cout << "ALARM TRIGGERED: " << message << std::endl;
+    logger.log_events("Error", "ALARM TRIGGERED: " + message);
     if (alarmType == 1) {
         isShutdownAlarm = true;
     } else {
@@ -69,7 +70,7 @@ void Alarm::activateAlarm(int alarmType, const std::string& message) {
 void Alarm::addAlarmCode(int code) {
     if (std::find(alarmCodes.begin(), alarmCodes.end(), code) == alarmCodes.end()) {
         alarmCodes.push_back(code);
-        std::cout << "Alarm code " << code << " added." << std::endl;
+        logger.log_events("Error", "Alarm code " + std::to_string(code) + " added.");
     }
 }
 
@@ -96,5 +97,5 @@ void Alarm::resetAlarm() {
     isWarningAlarm = false;
     clearTimers();
     alarmCodes.clear();
-    std::cout << "All alarms reset." << std::endl;
+    logger.log_events("Error", "All alarms reset.");
 }

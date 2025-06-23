@@ -74,7 +74,7 @@ inline std::atomic<float> setpoint{55.0f};
 // Logging config
 inline int log_retention_period = stoi(cfg.get("logging.retention_period"));
 inline int log_interval = stoi(cfg.get("logging.interval_sec"));
-time_t last_log_timestamp = time(NULL) - 400;
+extern time_t last_log_timestamp;
 
 // Function declarations
 void refrigeration_system(float return_temp_, float supply_temp_, float coil_temp_, float setpoint_);

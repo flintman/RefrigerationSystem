@@ -1,4 +1,5 @@
 #include "secure_client.h"
+#include "refrigeration.h"
 #include <openssl/ssl.h>
 #include <openssl/err.h>
 #include <unistd.h>
@@ -26,12 +27,12 @@ SecureClient::SecureClient(const std::string& server_ip,
 void SecureClient::connect() {
     cleanup();
 
-    std::cout << "Attempting to connect to " + server_ip_ + ":" + std::to_string(port_) << std::endl;
+   logger.log_events("Debug", "Attempting to connect to " + server_ip_ + ":" + std::to_string(port_));
 
     struct sockaddr_in server_addr{};
     socket_fd_ = socket(AF_INET, SOCK_STREAM, 0);
     if (socket_fd_ < 0) {
-        std::cout << "Socket creation failed" << std::endl;
+        logger.log_events("Error", "Socket creation failed");
         return;
     }
 
@@ -40,7 +41,7 @@ void SecureClient::connect() {
     inet_pton(AF_INET, server_ip_.c_str(), &server_addr.sin_addr);
 
     if (::connect(socket_fd_, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0) {
-        std::cout << "Connection failed. Retrying in " + std::to_string(reconnect_delay_) + " seconds..." << std::endl;
+        logger.log_events("Error", "Connection failed. Retrying in " + std::to_string(reconnect_delay_) + " seconds...");
         close(socket_fd_);
         std::this_thread::sleep_for(std::chrono::seconds(reconnect_delay_));
         return;
@@ -50,12 +51,12 @@ void SecureClient::connect() {
     SSL_set_fd(ssl_, socket_fd_);
 
     if (SSL_connect(ssl_) <= 0) {
-        std::cout << "SSL connection failed" << std::endl;
+        logger.log_events("Error", "SSL connection failed");
         cleanup();
         return;
     }
 
-    std::cout << "Securely connected to " + server_ip_ + ":" + std::to_string(port_) << std::endl;
+    logger.log_events("Debug", "Securely connected to " + server_ip_ + ":" + std::to_string(port_));
 }
 
 nlohmann::json SecureClient::send_and_receive(const nlohmann::json& data_to_send) {
@@ -67,19 +68,19 @@ nlohmann::json SecureClient::send_and_receive(const nlohmann::json& data_to_send
         int sent = SSL_write(ssl_, json_data.c_str(), json_data.length());
         if (sent <= 0) throw std::runtime_error("Send failed");
 
-        std::cout << "Sent: " + json_data << std::endl;
+        logger.log_events("Debug", "Sent: " + json_data);
 
         char buffer[1024] = {0};
         int received = SSL_read(ssl_, buffer, sizeof(buffer) - 1);
         if (received <= 0) throw std::runtime_error("No data received");
 
         std::string received_str(buffer, received);
-        std::cout << "Received: " + received_str << std::endl;
+        logger.log_events("Debug", "Received: " + received_str);
 
         return nlohmann::json::parse(received_str);
     }
     catch (const std::exception& e) {
-        std::cout << std::string("Communication error: ") + e.what()<< std::endl;
+        logger.log_events("Error", "Communication error: " + std::string(e.what()));
         cleanup();
         return nullptr;
     }

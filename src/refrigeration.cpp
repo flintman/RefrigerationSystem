@@ -7,6 +7,8 @@
 #include <sstream>
 #include <algorithm>
 
+time_t last_log_timestamp = time(NULL) - 400;
+
 void display_all_variables() {
     logger.log_events("Debug", "YOU NEED TO RUN config_editor to initialize the sensors");
     std::cout << "Logging Interval: " << cfg.get("logging.interval_sec") << " seconds\n";
