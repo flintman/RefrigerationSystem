@@ -7,7 +7,7 @@
 #include <sstream>
 #include <algorithm>
 
-time_t last_log_timestamp = time(NULL) - 400;
+time_t last_log_timestamp = time(nullptr) - 400;
 
 void display_all_variables() {
     logger.log_events("Debug", "YOU NEED TO RUN config_editor to initialize the sensors");
@@ -77,6 +77,7 @@ void update_sensor_thread() {
 
 void null_mode() {
     compressor_last_stop_time = time(nullptr);
+    state_timer = time(nullptr);
     {
         std::lock_guard<std::mutex> lock(status_mutex);
         status["status"] = "Null";
@@ -90,6 +91,7 @@ void null_mode() {
 }
 
 void cooling_mode() {
+    state_timer = time(nullptr);
     {
         std::lock_guard<std::mutex> lock(status_mutex);
         status["status"] = "Cooling";
@@ -103,6 +105,7 @@ void cooling_mode() {
 }
 
 void heating_mode() {
+    state_timer = time(nullptr);
     {
         std::lock_guard<std::mutex> lock(status_mutex);
         status["status"] = "Heating";
@@ -116,6 +119,7 @@ void heating_mode() {
 }
 
 void defrost_mode() {
+    state_timer = time(nullptr);
     defrost_start_time  = time(nullptr);
 
    {
@@ -131,6 +135,7 @@ void defrost_mode() {
 }
 
 void alarm_mode() {
+    state_timer = time(nullptr);
     {
         std::lock_guard<std::mutex> lock(status_mutex);
         status["status"] = "Alarm";
@@ -228,6 +233,10 @@ void display_system_thread() {
         supply_temp_ = supply_temp;
         coil_temp_ = coil_temp;
         setpoint_ = setpoint.load();
+        time_t state_duration = time(nullptr) - state_timer;
+        int hours = static_cast<int>(state_duration / 3600);
+        int minutes = static_cast<int>((state_duration % 3600) / 60);
+        int seconds = static_cast<int>(state_duration % 60);
         {
             std::lock_guard<std::mutex> lock(status_mutex);
             status_ = status["status"];
@@ -257,7 +266,11 @@ void display_system_thread() {
             }
 
             ss.str("");
+            ss << "       " << (hours < 10 ? "0" : "") << hours << ":"
+               << (minutes < 10 ? "0" : "") << minutes << ":"
+               << (seconds < 10 ? "0" : "") << seconds;
             display2.display("Status: " + status_, 0);
+            display2.display(ss.str(), 1);
 
         } catch (const std::exception& e) {
             logger.log_events("Error", std::string("During display updating: ") + e.what());
