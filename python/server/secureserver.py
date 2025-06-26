@@ -230,6 +230,7 @@ class SecureServer:
                     except Exception as e:
                         log(f"Error sending response to {addr}: {e}")
                     self.cleanup_old_data()
+                    break
         except Exception as e:
             log(f"Unexpected error with client {addr}: {e}")
         finally:
