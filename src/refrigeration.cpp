@@ -27,6 +27,25 @@ void display_all_variables() {
     std::cout << "  HAVE A NICE DAY AND LET ME KNOW IF YOU NEED HELP \n";
 }
 
+void check_sensor_status(float return_temp, float supply_temp, float coil_temp) {
+    // Check if any sensor readings are out of bounds
+    if (return_temp < -50.0f || return_temp > 150.0f) {
+        systemAlarm.activateAlarm(1, "2000: Return Sensor Failed.");
+        systemAlarm.addAlarmCode(2000);
+        logger.log_events("Error", "Return temperature out of bounds");
+    }
+    if (supply_temp < -50.0f || supply_temp > 150.0f) {
+        systemAlarm.activateAlarm(0, "2002: Supply Sensor Failed.");
+        systemAlarm.addAlarmCode(2002);
+        logger.log_events("Error", "Supply temperature out of bounds");
+    }
+    if (coil_temp < -50.0f || coil_temp > 150.0f) {
+        systemAlarm.activateAlarm(1, "2001: Coil Sensor Failed.");
+        systemAlarm.addAlarmCode(2001);
+        logger.log_events("Error", "Coil temperature out of bounds");
+    }
+}
+
 void update_sensor_thread() {
     using namespace std::chrono;
     std::this_thread::sleep_for(milliseconds(200)); // Wait for system to load
@@ -55,6 +74,7 @@ void update_sensor_thread() {
             std::lock_guard<std::mutex> lock(status_mutex);
             local_status = status;
         }
+        check_sensor_status(local_return_temp, local_supply_temp, local_coil_temp);
         if(!systemAlarm.getShutdownStatus()){
             refrigeration_system(local_return_temp, local_supply_temp, local_coil_temp, local_setpoint);
         }
@@ -206,8 +226,8 @@ void refrigeration_system(float return_temp_, float supply_temp_, float coil_tem
     }
 
     if(defrost_timed_out){
-        systemAlarm.activateAlarm(0, "9001: Defrost timed out.");
-        systemAlarm.addAlarmCode(9001);
+        systemAlarm.activateAlarm(0, "1004: Defrost timed out.");
+        systemAlarm.addAlarmCode(1004);
         defrost_timed_out = false;
     }
 
