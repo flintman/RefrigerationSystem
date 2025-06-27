@@ -42,13 +42,11 @@ TOOL_OBJS := $(patsubst $(TOOLS_DIR)/%.cpp, $(OBJ_DIR)/%.o, $(TOOL_SRCS))
 ALL_OBJS = $(TOOL_OBJS) $(OBJ_DIR)/config_manager.o $(OBJ_DIR)/config_validator.o $(OBJ_DIR)/sensor_manager.o
 
 # Default target
-all: $(TARGET) $(TOOL_TARGET)
+all: deb
 	@echo "--------------------------------------------------------------------------------"
 	@echo ""
 	@echo "--------------------------------------------------------------------------------"
 	@echo "Build completed successfully!"
-	@echo "Main executable located at: $(abspath $(TARGET))"
-	@echo "Tool executable located at: $(abspath $(TOOL_TARGET))"
 
 # Linking
 $(TARGET): $(OBJS) $(VENDOR_OBJS)
@@ -74,7 +72,7 @@ $(OBJ_DIR)/vendor/%.o: $(VENDOR_DIR)/%.c
 	@mkdir -p $(@D)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-deb: all
+deb: $(TARGET) $(TOOL_TARGET)
 	@echo "Building .deb package..."
 	rm -rf $(DEB_DIR)
 	mkdir -p $(DEB_DIR)/DEBIAN
