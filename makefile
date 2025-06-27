@@ -17,6 +17,11 @@ BUILD_DIR = build
 TOOLS_DIR = tools
 OBJ_DIR = $(BUILD_DIR)/obj
 BIN_DIR = $(BUILD_DIR)/bin
+DEB_DIR = $(BUILD_DIR)/deb
+DEB_NAME = refrigeration
+ # Make sure to update the version # in refrigeration.h
+DEB_VERSION = 1.0.0
+DEB_ARCH = armhf
 
 # Executable name
 TARGET = $(BIN_DIR)/refrigeration
@@ -68,6 +73,48 @@ $(OBJ_DIR)/%.o: $(TOOLS_DIR)/%.cpp
 $(OBJ_DIR)/vendor/%.o: $(VENDOR_DIR)/%.c
 	@mkdir -p $(@D)
 	$(CC) $(CFLAGS) -c $< -o $@
+
+deb: all
+	@echo "Building .deb package..."
+	rm -rf $(DEB_DIR)
+	mkdir -p $(DEB_DIR)/DEBIAN
+	mkdir -p $(DEB_DIR)/usr/bin
+	mkdir -p $(DEB_DIR)/etc/systemd/system/
+
+	# Control file
+	echo "Package: $(DEB_NAME)" > $(DEB_DIR)/DEBIAN/control
+	echo "Version: $(DEB_VERSION)" >> $(DEB_DIR)/DEBIAN/control
+	echo "Section: base" >> $(DEB_DIR)/DEBIAN/control
+	echo "Priority: optional" >> $(DEB_DIR)/DEBIAN/control
+	echo "Architecture: $(DEB_ARCH)" >> $(DEB_DIR)/DEBIAN/control
+	echo "Maintainer: William Bellvance Jr <william@bellavance.co>" >> $(DEB_DIR)/DEBIAN/control
+	echo "Description: Refrigeration system controller and config tool" >> $(DEB_DIR)/DEBIAN/control
+
+	# Post install script
+	echo "#!/bin/bash" > $(DEB_DIR)/DEBIAN/postinst
+	echo "systemctl daemon-reexec" >> $(DEB_DIR)/DEBIAN/postinst
+	echo "systemctl daemon-reload" >> $(DEB_DIR)/DEBIAN/postinst
+	echo "systemctl enable $(DEB_NAME).service" >> $(DEB_DIR)/DEBIAN/postinst
+	echo "systemctl start $(DEB_NAME).service" >> $(DEB_DIR)/DEBIAN/postinst
+	chmod +x $(DEB_DIR)/DEBIAN/postinst
+
+	# Pre-removal script
+	echo "#!/bin/bash" > $(DEB_DIR)/DEBIAN/prerm
+	echo "systemctl stop $(DEB_NAME).service" >> $(DEB_DIR)/DEBIAN/prerm
+	echo "systemctl disable $(DEB_NAME).service" >> $(DEB_DIR)/DEBIAN/prerm
+	chmod +x $(DEB_DIR)/DEBIAN/prerm
+
+	# Copy service file
+	cp services/$(DEB_NAME).service $(DEB_DIR)/etc/systemd/system/$(DEB_NAME).service
+
+	# Copy compiled binaries
+	cp $(TARGET) $(DEB_DIR)/usr/bin/$(DEB_NAME)
+	cp $(TOOL_TARGET) $(DEB_DIR)/usr/bin/config_editor
+
+	# Build the .deb
+	dpkg-deb --build $(DEB_DIR) $(BUILD_DIR)/$(DEB_NAME)_$(DEB_VERSION)_$(DEB_ARCH).deb
+	@echo "--------------------------------------------------------------------------------"
+	@echo ".deb package built: $(BUILD_DIR)/$(DEB_NAME)_$(DEB_VERSION)_$(DEB_ARCH).deb"
 
 # Clean up
 clean:

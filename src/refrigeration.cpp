@@ -682,6 +682,11 @@ int main(int argc, char* argv[]) {
     try {
         if (cfg.get("sensor.return") == "0") {
             display_all_variables();
+            running = false; // Stop all threads if any were started elsewhere
+            std::cout << "Exiting because sensors are not initialized.\n";
+            // If running as a systemd service, request stop:
+            system("systemctl stop refrigeration.service");
+            return 0;
         } else {
             std::thread refrigeration_thread(update_sensor_thread);
             std::thread setpoint_thread(setpoint_system_thread);

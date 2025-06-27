@@ -3,7 +3,7 @@
 namespace fs = std::filesystem;
 
 Logger::Logger(int debug)
-    : debug_code(debug), log_folder("logs") {
+    : debug_code(debug), log_folder("/var/log/refrigeration") {
     fs::create_directories(log_folder);
 }
 

@@ -147,9 +147,17 @@ int main(int argc, char* argv[]) {
         std::cout << "Waiting for ./refrigeration to close...\n";
     }
 
+    const char* defaultConfig = "/etc/refrigeration/config.env";
     if (argc != 2) {
-        std::cerr << "Usage: " << argv[0] << " <config_file_path>\n";
-        return 1;
+        // Check if default config exists
+        FILE* file = fopen(defaultConfig, "r");
+        if (!file) {
+            std::cerr << "Usage: " << argv[0] << " <config_file_path>\n";
+            std::cerr << "Default config file not found at " << defaultConfig << "\n";
+            return 1;
+        }
+        fclose(file);
+        argv[1] = const_cast<char*>(defaultConfig);
     }
 
     ConfigEditor editor(argv[1]);

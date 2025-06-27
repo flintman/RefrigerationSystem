@@ -1,0 +1,17 @@
+[Unit]
+Description=Refrigeration C++ Programt
+After=network.target multi-user.target
+
+[Service]
+Type=simple
+WorkingDirectory=/usr/bin/
+User=root
+ExecStart=/usr/bin/refrigeration
+KillMode=control-group
+KillSignal=SIGINT
+TimeoutStopSec=30s
+Restart=always
+RestartSec=10s
+
+[Install]
+WantedBy=multi-user.target

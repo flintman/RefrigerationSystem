@@ -20,8 +20,8 @@
 #include "secure_client.h"
 
 // Version and config
-inline const std::string version = "1.0.0";
-inline const std::string config_file_name = "config.env";
+inline const std::string version = "1.0.0"; //Make sure you update the version in Makefile.
+inline const std::string config_file_name = "/etc/refrigeration/config.env";
 
 // Global state and synchronization
 inline std::atomic<bool> running{true};
