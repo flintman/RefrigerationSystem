@@ -80,6 +80,7 @@ deb: all
 	mkdir -p $(DEB_DIR)/DEBIAN
 	mkdir -p $(DEB_DIR)/usr/bin
 	mkdir -p $(DEB_DIR)/etc/systemd/system/
+	mkdir -p $(DEB_DIR)/etc/refrigeration
 
 	# Control file
 	echo "Package: $(DEB_NAME)" > $(DEB_DIR)/DEBIAN/control
@@ -103,6 +104,9 @@ deb: all
 	echo "systemctl stop $(DEB_NAME).service" >> $(DEB_DIR)/DEBIAN/prerm
 	echo "systemctl disable $(DEB_NAME).service" >> $(DEB_DIR)/DEBIAN/prerm
 	chmod +x $(DEB_DIR)/DEBIAN/prerm
+
+	# Copy SSL certificate
+	cp python/server/ssl/cert.pem $(DEB_DIR)/etc/refrigeration/cert.pem
 
 	# Copy service file
 	cp services/$(DEB_NAME).service $(DEB_DIR)/etc/systemd/system/$(DEB_NAME).service

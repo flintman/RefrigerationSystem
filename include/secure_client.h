@@ -11,7 +11,7 @@
 class SecureClient {
 public:
     SecureClient(const std::string& server_ip = "72.70.48.6",
-                 int port = 5001, const std::string& cert_file = "/home/flintman/ssl/cert.pem");
+                 int port = 5001, const std::string& cert_file = "/etc/refrigeration/cert.pem");
 
     void connect();
     nlohmann::json send_and_receive(const nlohmann::json& data_to_send);
