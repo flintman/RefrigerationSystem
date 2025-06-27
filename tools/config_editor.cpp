@@ -25,9 +25,6 @@ public:
 
             int choice = getMenuChoice(2); // 1: Edit config, 2: Service menu, 0: Exit
             if (choice == 0) {
-                if (confirmSave()) {
-                    manager.save();
-                }
                 break;
             } else if (choice == 1) {
                 // Stop service before editing config
@@ -69,7 +66,7 @@ private:
         std::cout << "=== Main Menu ===\n";
         std::cout << "1. Edit configuration (requires stopping refrigeration.service)\n";
         std::cout << "2. Manage refrigeration.service\n";
-        std::cout << "0. Save and Exit\n\n";
+        std::cout << "0. Exit\n\n";
         std::cout << "Enter your choice: ";
     }
 
@@ -90,7 +87,12 @@ private:
             printConfigMenu();
 
             int choice = getMenuChoice(manager.getSchema().size());
-            if (choice == 0) break;
+            if (choice == 0) {
+                if (confirmSave()) {
+                    manager.save();
+                }
+                break;
+            }
 
             if (choice > 0 && choice <= manager.getSchema().size()) {
                 editConfigItem(choice - 1);
@@ -101,7 +103,7 @@ private:
     void printConfigMenu() {
         std::cout << "=== Config Menu ===\n";
         std::cout << "1-" << manager.getSchema().size() << ". Edit configuration item\n";
-        std::cout << "0. Back to Main Menu\n\n";
+        std::cout << "0. Save and back to Main Menu\n\n";
         std::cout << "Enter your choice: ";
     }
 
@@ -147,6 +149,9 @@ private:
     }
 
     int killRefrigerationProcess() {
+        // Stop the systemd service first
+        system("sudo systemctl stop refrigeration.service");
+
         FILE* pipe = popen("pgrep -x refrigeration", "r");
         if (!pipe) return 0;
         char buffer[128];
