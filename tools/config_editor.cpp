@@ -21,18 +21,22 @@ public:
         while (true) {
             clearScreen();
             printCurrentConfig();
-            printMenu();
+            printMainMenu();
 
-            int choice = getMenuChoice();
+            int choice = getMenuChoice(2); // 1: Edit config, 2: Service menu, 0: Exit
             if (choice == 0) {
                 if (confirmSave()) {
                     manager.save();
                 }
                 break;
-            }
-
-            if (choice > 0 && choice <= manager.getSchema().size()) {
-                editConfigItem(choice - 1);
+            } else if (choice == 1) {
+                // Stop service before editing config
+                if (killRefrigerationProcess()) {
+                    std::cout << "Waiting for ./refrigeration to close...\n";
+                }
+                runConfigMenu();
+            } else if (choice == 2) {
+                runServiceMenu();
             }
         }
     }
@@ -61,21 +65,112 @@ private:
         std::cout << "\n\n";
     }
 
-    void printMenu() {
-        std::cout << "=== Menu ===\n";
-        std::cout << "1-" << manager.getSchema().size() << ". Edit configuration item\n";
+    void printMainMenu() {
+        std::cout << "=== Main Menu ===\n";
+        std::cout << "1. Edit configuration (requires stopping refrigeration.service)\n";
+        std::cout << "2. Manage refrigeration.service\n";
         std::cout << "0. Save and Exit\n\n";
         std::cout << "Enter your choice: ";
     }
 
-    int getMenuChoice() {
+    int getMenuChoice(int maxOption) {
         int choice;
-        while (!(std::cin >> choice) || choice < 0 || choice > manager.getSchema().size()) {
+        while (!(std::cin >> choice) || choice < 0 || choice > maxOption) {
             std::cin.clear();
             std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
             std::cout << "Invalid choice. Please try again: ";
         }
         return choice;
+    }
+
+    void runConfigMenu() {
+        while (true) {
+            clearScreen();
+            printCurrentConfig();
+            printConfigMenu();
+
+            int choice = getMenuChoice(manager.getSchema().size());
+            if (choice == 0) break;
+
+            if (choice > 0 && choice <= manager.getSchema().size()) {
+                editConfigItem(choice - 1);
+            }
+        }
+    }
+
+    void printConfigMenu() {
+        std::cout << "=== Config Menu ===\n";
+        std::cout << "1-" << manager.getSchema().size() << ". Edit configuration item\n";
+        std::cout << "0. Back to Main Menu\n\n";
+        std::cout << "Enter your choice: ";
+    }
+
+    void runServiceMenu() {
+        while (true) {
+            clearScreen();
+            std::cout << "=== refrigeration.service Menu ===\n";
+            std::cout << "1. Start service\n";
+            std::cout << "2. Stop service\n";
+            std::cout << "3. Restart service\n";
+            std::cout << "4. View logs (journalctl -u refrigeration.service -f)\n";
+            std::cout << "0. Back to Main Menu\n";
+            std::cout << "Enter your choice: ";
+
+            int choice = getMenuChoice(4);
+            if (choice == 0) break;
+
+            switch (choice) {
+                case 1:
+                    system("sudo systemctl start refrigeration.service");
+                    std::cout << "Service started. Press Enter to continue...";
+                    std::cin.ignore();
+                    std::cin.get();
+                    break;
+                case 2:
+                    system("sudo systemctl stop refrigeration.service");
+                    std::cout << "Service stopped. Press Enter to continue...";
+                    std::cin.ignore();
+                    std::cin.get();
+                    break;
+                case 3:
+                    system("sudo systemctl restart refrigeration.service");
+                    std::cout << "Service restarted. Press Enter to continue...";
+                    std::cin.ignore();
+                    std::cin.get();
+                    break;
+                case 4:
+                    std::cout << "Press Ctrl+C to exit logs.\n";
+                    system("sudo journalctl -u refrigeration.service -f");
+                    break;
+            }
+        }
+    }
+
+    int killRefrigerationProcess() {
+        FILE* pipe = popen("pgrep -x refrigeration", "r");
+        if (!pipe) return 0;
+        char buffer[128];
+        bool killed = false;
+        while (fgets(buffer, sizeof(buffer), pipe)) {
+            int pid = atoi(buffer);
+            if (pid > 0) {
+                kill(pid, SIGINT); // Send Ctrl+C
+                killed = true;
+            }
+        }
+        pclose(pipe);
+
+        // Wait for process to exit
+        if (killed) {
+            while (true) {
+                FILE* check = popen("pgrep -x refrigeration", "r");
+                bool running = (fgets(buffer, sizeof(buffer), check) != nullptr);
+                pclose(check);
+                if (!running) break;
+                std::this_thread::sleep_for(std::chrono::milliseconds(200));
+            }
+        }
+        return killed ? 1 : 0;
     }
 
     void editConfigItem(int index) {
@@ -115,38 +210,7 @@ private:
     }
 };
 
-int killRefrigerationProcess() {
-    FILE* pipe = popen("pgrep -x refrigeration", "r");
-    if (!pipe) return 0;
-    char buffer[128];
-    bool killed = false;
-    while (fgets(buffer, sizeof(buffer), pipe)) {
-        int pid = atoi(buffer);
-        if (pid > 0) {
-            kill(pid, SIGINT); // Send Ctrl+C
-            killed = true;
-        }
-    }
-    pclose(pipe);
-
-    // Wait for process to exit
-    if (killed) {
-        while (true) {
-            FILE* check = popen("pgrep -x refrigeration", "r");
-            bool running = (fgets(buffer, sizeof(buffer), check) != nullptr);
-            pclose(check);
-            if (!running) break;
-            std::this_thread::sleep_for(std::chrono::milliseconds(200));
-        }
-    }
-    return killed ? 1 : 0;
-}
-
 int main(int argc, char* argv[]) {
-    if (killRefrigerationProcess()) {
-        std::cout << "Waiting for ./refrigeration to close...\n";
-    }
-
     const char* defaultConfig = "/etc/refrigeration/config.env";
     if (argc != 2) {
         // Check if default config exists
