@@ -543,7 +543,9 @@ void checkAlarms_system(){
             systemAlarm.clearTimers();
         }
         if (systemAlarm.getShutdownStatus()) {
-            alarm_mode();
+            if (status_ != "Alarm") {
+                alarm_mode();
+            }
         } else {
             if (status_ == "Alarm") {
                 null_mode();
