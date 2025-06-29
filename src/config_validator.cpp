@@ -13,6 +13,7 @@ ConfigValidator::ConfigValidator() {
         {"compressor.off_timer",     {"5", ConfigType::Integer}},
         {"debug.code",               {"1", ConfigType::Boolean}},
         {"wifi.enable_hotspot",      {"1", ConfigType::Boolean}},
+        {"wifi.hotspot_password",    {"changeme", ConfigType::String}},
         {"debug.enable_send_data",   {"0", ConfigType::Boolean}},
         {"sensor.return",   {"0", ConfigType::Integer}},
         {"sensor.supply",   {"0", ConfigType::Integer}},

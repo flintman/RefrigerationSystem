@@ -479,8 +479,9 @@ void hotspot_start() {
     bool enable_hotspot_loop = false;
     int enable_hotspot = stoi(cfg.get("wifi.enable_hotspot"));
     std::string ssid = "CJJ-LEASING-" + cfg.get("trl.number");
+    std::string hotspot_password = cfg.get("wifi.hotspot_password");
     if (enable_hotspot == 1) {
-        wifi_manager.set_credentials(ssid, "ThisIsMyPassword4646");
+        wifi_manager.set_credentials(ssid, hotspot_password);
         wifi_manager.start_hotspot();
         logger.log_events("Debug", "Hotspot started. Checking for clients...");
         enable_hotspot_loop = true;
