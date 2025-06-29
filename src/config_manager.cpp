@@ -52,6 +52,12 @@ void ConfigManager::initializeWithDefaults() {
     }
 }
 
+bool ConfigManager::resetToDefaults() {
+    configValues_.clear();
+    initializeWithDefaults();
+    return save();
+}
+
 void ConfigManager::loadFromDotEnv() {
     int fd = open(filepath_.c_str(), O_RDONLY);
     if (fd == -1) {

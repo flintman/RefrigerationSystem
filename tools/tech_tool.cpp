@@ -85,17 +85,28 @@ private:
             clearScreen();
             printCurrentConfig();
             printConfigMenu();
+            std::string choiceStr;
+            std::cin >> choiceStr;
 
-            int choice = getMenuChoice(manager.getSchema().size());
-            if (choice == 0) {
+            if (choiceStr == "0") {
                 if (confirmSave()) {
                     manager.save();
                 }
                 break;
             }
 
-            if (choice > 0 && choice <= manager.getSchema().size()) {
-                editConfigItem(choice - 1);
+            if (choiceStr == "D" || choiceStr == "d") {
+                resetConfigFileToDefault();
+                continue;
+            }
+
+            try {
+                int choice = std::stoi(choiceStr);
+                if (choice > 0 && choice <= static_cast<int>(manager.getSchema().size())) {
+                    editConfigItem(choice - 1);
+                }
+            } catch (...) {
+                // Invalid input, ignore and loop again
             }
         }
     }
@@ -103,8 +114,28 @@ private:
     void printConfigMenu() {
         std::cout << "=== Config Menu ===\n";
         std::cout << "1-" << manager.getSchema().size() << ". Edit configuration item\n";
-        std::cout << "0. Save and back to Main Menu\n\n";
+        std::cout << "D. Reset config file to default\n\n";
+        std::cout << "0. Save and back to Main Menu\n";
         std::cout << "Enter your choice: ";
+    }
+
+    void resetConfigFileToDefault() {
+        std::cout << "Are you sure you want to reset the configuration file to default values? (y/n): ";
+        char confirm;
+        std::cin >> confirm;
+        if (confirm == 'y' || confirm == 'Y') {
+            manager.resetToDefaults();
+        } else {
+            std::cout << "Reset cancelled.\n";
+            std::cout << "Press Enter to continue...";
+            std::cin.ignore();
+            std::cin.get();
+            return;
+        }
+        std::cout << "Configuration file has been reset to default values.\n";
+        std::cout << "Press Enter to continue...";
+        std::cin.ignore();
+        std::cin.get();
     }
 
     void runServiceMenu() {
