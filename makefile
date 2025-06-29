@@ -25,7 +25,7 @@ DEB_ARCH = armhf
 
 # Executable name
 TARGET = $(BIN_DIR)/refrigeration
-TOOL_TARGET = $(BIN_DIR)/config_editor
+TOOL_TARGET = $(BIN_DIR)/tech-tool
 
 # Source and object files
 SRCS := $(wildcard $(SRC_DIR)/*.cpp)
@@ -111,7 +111,7 @@ deb: $(TARGET) $(TOOL_TARGET)
 
 	# Copy compiled binaries
 	cp $(TARGET) $(DEB_DIR)/usr/bin/$(DEB_NAME)
-	cp $(TOOL_TARGET) $(DEB_DIR)/usr/bin/config_editor
+	cp $(TOOL_TARGET) $(DEB_DIR)/usr/bin/tech-tool
 
 	# Build the .deb
 	dpkg-deb --build $(DEB_DIR) $(BUILD_DIR)/$(DEB_NAME)_$(DEB_VERSION)_$(DEB_ARCH).deb

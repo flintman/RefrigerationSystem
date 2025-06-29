@@ -10,7 +10,7 @@
 time_t last_log_timestamp = time(nullptr) - 400;
 
 void display_all_variables() {
-    logger.log_events("Debug", "YOU NEED TO RUN config_editor to initialize the sensors");
+    logger.log_events("Debug", "YOU NEED TO RUN 'sudo tech-tool' to initialize the sensors");
     std::cout << "Logging Interval: " << cfg.get("logging.interval_sec") << " seconds\n";
     std::cout << "Log Retention Period: " << cfg.get("logging.retention_period") << " days\n";
     std::cout << "TRL Number: " << cfg.get("trl.number") << "\n";

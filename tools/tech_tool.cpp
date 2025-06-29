@@ -1,4 +1,4 @@
-// config_editor.cpp
+// tech_tool.cpp
 #include "config_manager.h"
 #include "config_validator.h"
 #include "sensor_manager.h"
