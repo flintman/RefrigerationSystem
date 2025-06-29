@@ -682,6 +682,8 @@ int main(int argc, char* argv[]) {
     try {
         if (cfg.get("sensor.return") == "0") {
             display_all_variables();
+            std::thread hotspot_system(hotspot_start);
+            hotspot_system.join();
             running = false; // Stop all threads if any were started elsewhere
             std::cout << "Exiting because sensors are not initialized.\n";
             // If running as a systemd service, request stop:
