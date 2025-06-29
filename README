@@ -2,7 +2,13 @@
 
 The is my software to control a refrigeration system with a raspberry pi.
 
-#######  On Start Up ########
+####### To Install #######
+1. sudo raspi-config
+    a. Enable 1-Wire, 12C, and SPI and reboot
+2. install the .deb file.
+3. sudo tech-tool to setup the device.
+
+#######  On Start Up #######
 On Startup the system will broadcast a hotspot to be able to connect to it.  This will last for 5 minutes unless you connect to the hotspot and then the hotspot will last
 as long as you are connected.
 
