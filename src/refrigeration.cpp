@@ -291,6 +291,8 @@ void display_system_thread() {
                << (seconds < 10 ? "0" : "") << seconds;
             display2.display("Status: " + status_, 0);
             display2.display(ss.str(), 1);
+            display2.display("IP:" + wifi_manager.get_ip_address("wlan0"), 2);
+            display2.display("HP:" + wifi_manager.get_ip_address("wlan0_ap"), 3);
 
         } catch (const std::exception& e) {
             logger.log_events("Error", std::string("During display updating: ") + e.what());
