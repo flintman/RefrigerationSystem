@@ -191,54 +191,59 @@ void refrigeration_system(float return_temp_, float supply_temp_, float coil_tem
         status_ = status["status"];
     }
 
-    if (status_ == "Cooling" && return_temp_ <= setpoint_) {
-        null_mode();
-    }
-
-    if (status_ == "Heating" && return_temp_ >= setpoint_) {
-        null_mode();
-    }
-
-    if (status_ == "Null") {
-        if (current_time - compressor_last_stop_time >= static_cast<time_t>(off_timer_value)) {
-            if (return_temp_ >= (setpoint_ + setpoint_offset)) {
-                cooling_mode();
-            }
-            if (return_temp_ <= (setpoint_ - setpoint_offset)) {
-                heating_mode();
-            }
-            anti_timer = false;
-        } else {
-            if(!anti_timer) {
-                logger.log_events("Debug", "Inside AntiCycle");
-                anti_timer = true;
-            }
-        }
-    }
-
-    if (status_ == "Defrost") {
-        defrost_timed_out = (current_time - defrost_start_time) > defrost_timeout;
-        if ((coil_temp_ > defrost_coil_temperature) || defrost_timed_out) {
+    if(!pretrip_enable){
+        if (status_ == "Cooling" && return_temp_ <= setpoint_) {
             null_mode();
-            defrost_last_time = time(nullptr);
-            defrost_start_time = 0;
         }
-    }
 
-    if(defrost_timed_out){
-        systemAlarm.activateAlarm(0, "1004: Defrost timed out.");
-        systemAlarm.addAlarmCode(1004);
-        defrost_timed_out = false;
-    }
+        if (status_ == "Heating" && return_temp_ >= setpoint_) {
+            null_mode();
+        }
 
-    if (coil_temp_ < defrost_coil_temperature) {
-        if (((current_time - defrost_last_time) > defrost_intervals) || trigger_defrost) {
-            if (defrost_start_time == 0) {
-                defrost_mode();
+        if (status_ == "Null") {
+            if (current_time - compressor_last_stop_time >= static_cast<time_t>(off_timer_value)) {
+                if (return_temp_ >= (setpoint_ + setpoint_offset)) {
+                    cooling_mode();
+                }
+                if (return_temp_ <= (setpoint_ - setpoint_offset)) {
+                    heating_mode();
+                }
+                anti_timer = false;
+            } else {
+                if(!anti_timer) {
+                    logger.log_events("Debug", "Inside AntiCycle");
+                    anti_timer = true;
+                }
             }
         }
+
+        if (status_ == "Defrost") {
+            defrost_timed_out = (current_time - defrost_start_time) > defrost_timeout;
+            if ((coil_temp_ > defrost_coil_temperature) || defrost_timed_out) {
+                null_mode();
+                defrost_last_time = time(nullptr);
+                defrost_start_time = 0;
+            }
+        }
+
+        if(defrost_timed_out){
+            systemAlarm.activateAlarm(0, "1004: Defrost timed out.");
+            systemAlarm.addAlarmCode(1004);
+            defrost_timed_out = false;
+        }
+
+        if (coil_temp_ < defrost_coil_temperature) {
+            if (((current_time - defrost_last_time) > defrost_intervals) || trigger_defrost) {
+                if (defrost_start_time == 0) {
+                    defrost_mode();
+                }
+            }
+        }
+        trigger_defrost = false;
+    } else {
+        pretrip_mode();
+        return;
     }
-    trigger_defrost = false;
 }
 
 void display_system_thread() {
@@ -260,6 +265,10 @@ void display_system_thread() {
         {
             std::lock_guard<std::mutex> lock(status_mutex);
             status_ = status["status"];
+        }
+
+        if(pretrip_enable){
+            status_ = "P-" + status_;
         }
 
         try {
@@ -316,35 +325,42 @@ void setpoint_system_thread() {
     float voltage = 0.0f;
 
     while (running) {
-        try {
-            voltage = adc.readVoltage(3);
-        } catch (const std::exception& e) {
-            logger.log_events("Error", std::string("ADS1115 error: ") + e.what());
-        }
-        if (!std::isfinite(voltage)) {
-            logger.log_events("Error", "Invalid voltage reading!");
-            continue;
-        }
-        if (max_voltage == min_voltage) {
-            logger.log_events("Error", "max_voltage and min_voltage are equal! Skipping setpoint calculation.");
-            continue;
-        }
+        if(pretrip_enable) {
+            if(pretrip_stage == 1) setpoint = 32.0f;
+            else if(pretrip_stage == 2) setpoint = 80.0f;
+            else if(pretrip_stage == 3) setpoint = 32.0f;
+            std::this_thread::sleep_for(std::chrono::milliseconds(200));
+        } else {
+            try {
+                voltage = adc.readVoltage(3);
+            } catch (const std::exception& e) {
+                logger.log_events("Error", std::string("ADS1115 error: ") + e.what());
+            }
+            if (!std::isfinite(voltage)) {
+                logger.log_events("Error", "Invalid voltage reading!");
+                continue;
+            }
+            if (max_voltage == min_voltage) {
+                logger.log_events("Error", "max_voltage and min_voltage are equal! Skipping setpoint calculation.");
+                continue;
+            }
 
-        float m = (max_setpoint - min_setpoint) / (max_voltage - min_voltage);
-        if (!std::isfinite(m)) {
-            logger.log_events("Error", "m is not finite!");
-            continue;
-        }
-        float b = min_setpoint - (m * min_voltage);
-        if (!std::isfinite(b)) {
-            logger.log_events("Error", "b is not finite!");
-            continue;
-        }
-        float setpoint_ = m * voltage + b;
+            float m = (max_setpoint - min_setpoint) / (max_voltage - min_voltage);
+            if (!std::isfinite(m)) {
+                logger.log_events("Error", "m is not finite!");
+                continue;
+            }
+            float b = min_setpoint - (m * min_voltage);
+            if (!std::isfinite(b)) {
+                logger.log_events("Error", "b is not finite!");
+                continue;
+            }
+            float setpoint_ = m * voltage + b;
 
-        setpoint = std::clamp(setpoint_, min_setpoint, max_setpoint);
-        setpoint = std::round(setpoint * 1.0f) / 1.0f;
-        std::this_thread::sleep_for(std::chrono::milliseconds(200));
+            setpoint = std::clamp(setpoint_, min_setpoint, max_setpoint);
+            setpoint = std::round(setpoint * 1.0f) / 1.0f;
+            std::this_thread::sleep_for(std::chrono::milliseconds(200));
+        }
     }
 }
 
@@ -426,8 +442,12 @@ void checkDefrostPin() {
             logger.log_events("Debug", "Defrost Button released in " + std::to_string(press_duration));
 
             int setpoint_int = static_cast<int>(setpoint.load());
+            logger.log_events("Debug", "Defrost Button released in " + std::to_string(press_duration) + "setpoint_int: " + std::to_string(setpoint_int));
             if (press_duration >= 5 && setpoint_int == 65) {
-                logger.log_events("Debug", "Entering Pretrip");
+                if(!pretrip_enable) {
+                    pretrip_enable = true;
+                    logger.log_events("Debug", "Entering Pretrip Mode");
+                }
             } else if (press_duration >= 5 && setpoint_int == 80) {
                 if (demo_mode) {
                     demo_mode = false;
@@ -652,6 +672,80 @@ void secureclient_loop() {
         }
 
         interruptible_sleep(secureclient_timer);
+    }
+}
+
+void pretrip_mode() {
+    // If just entered pretrip mode, initialize
+    if (pretrip_stage == 0) {
+        logger.log_events("Debug", "Starting Pretrip Mode");
+        pretrip_stage = 1;
+        pretrip_stage_start = time(nullptr);
+        cooling_mode();
+        logger.log_events("Debug", "Pretrip: Cooling for 10 minutes");
+        return;
+    }
+
+    time_t now = time(nullptr);
+
+    switch (pretrip_stage) {
+        case 1: // Cooling for 10 minutes
+            if (return_temp >= (coil_temp + 4.0f)) {
+                logger.log_events("Debug", "Pretrip: Cooling confirmed");
+                pretrip_stage = 2;
+                pretrip_stage_start = now;
+                heating_mode();
+                logger.log_events("Debug", "Pretrip: Heating for 10 minutes");
+            } else if (now - pretrip_stage_start >= 600) {
+                systemAlarm.activateAlarm(1, "9001: Pretrip Cooling Failed.");
+                systemAlarm.addAlarmCode(9001);
+                logger.log_events("Debug", "Pretrip: Cooling timeout reached");
+                pretrip_stage = 4;
+                pretrip_stage_start = now;
+            }
+            return;
+        case 2: // Heating for 10 minutes
+            if (systemAlarm.alarmAnyStatus()) {
+                logger.log_events("Debug", "Pretrip: Alarm status detected");
+                pretrip_stage = 4;
+                pretrip_stage_start = now;
+            } else if (return_temp <= (coil_temp - 4.0f)) {
+                logger.log_events("Debug", "Pretrip: Heating confirmed");
+                pretrip_stage = 3;
+                pretrip_stage_start = now;
+                cooling_mode();
+                logger.log_events("Debug", "Pretrip: Cooling for 5 minutes");
+            } else if (now - pretrip_stage_start >= 600) {
+                systemAlarm.activateAlarm(1, "9002: Pretrip Heating Failed.");
+                systemAlarm.addAlarmCode(9002);
+                logger.log_events("Debug", "Pretrip: Heating timeout reached");
+                pretrip_stage = 4;
+                pretrip_stage_start = now;
+            }
+            return;
+        case 3: // Cooling for 5 minutes
+            if (systemAlarm.alarmAnyStatus()) {
+                logger.log_events("Debug", "Pretrip: Alarm status detected");
+                pretrip_stage = 4;
+                pretrip_stage_start = now;
+            } else if (return_temp >= (coil_temp + 4.0f)) {
+                logger.log_events("Debug", "Pretrip: Cooling confirmed (final)");
+                pretrip_stage = 4;
+                pretrip_stage_start = now;
+            } else if (now - pretrip_stage_start >= 300) {
+                systemAlarm.activateAlarm(1, "9003: Pretrip Cooling Failed 2nd time.");
+                systemAlarm.addAlarmCode(9003);
+                logger.log_events("Debug", "Pretrip: 2nd Cooling timeout reached");
+                pretrip_stage = 4;
+                pretrip_stage_start = now;
+            }
+            return;
+        case 4: // Done
+            null_mode();
+            pretrip_enable = false;
+            pretrip_stage = 0;
+            logger.log_events("Debug", "Pretrip: Completed");
+            return;
     }
 }
 

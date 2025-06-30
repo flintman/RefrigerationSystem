@@ -12,7 +12,6 @@ The is my software to control a refrigeration system with a raspberry pi.
 On Startup the system will broadcast a hotspot to be able to connect to it.  This will last for 5 minutes unless you connect to the hotspot and then the hotspot will last
 as long as you are connected.
 
-
 #######  Alarm codes #######
     Shutdown Alarms
         1001 - Unit not cooling - looking for at least 5F across the coil over 30 minute  AND  Return Temp is over 30F
@@ -22,12 +21,19 @@ as long as you are connected.
         2000 - Return Sensor Failure - Outside of the range
         2001 - Coil Sensor Failure - Outside of the range
 
+        9001 - Pretrip Cooling issue
+        9002 - Pretrip Heating issue
+        9003 - Pretrip Cooling issue # 2
+
     Warning Alarms
         2002 - Supply Sensor Failure - Outside of the range
 
 
 ####### Demo Mode #######
 Set the setpoint to 80F and press and hold the defrost button for 10 sec.  This will toggle it in and out of Demo Mode.  This will simulate cooling, heating, defrost, etc to test the equipment and see how it works.
+
+####### PRETRIP Mode #######
+Set the setpoint to 65F and press and hold the defrost button for 10 sec.  This will start pretrip mode.  This will simulate cooling, heating, and back to cooling before either alarming out or passing.
 
 ####### GPIO Pins used  #########
 Compressor Output : 17

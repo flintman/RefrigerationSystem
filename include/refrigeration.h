@@ -34,13 +34,16 @@ inline std::atomic<bool> isWarningAlarm(false);
 // Refrigeration state
 inline std::atomic<bool> demo_mode(false);
 inline std::atomic<bool> trigger_defrost{false};
+inline std::atomic<bool> pretrip_enable(false);
+inline std::atomic<bool> anti_timer{false};
 inline std::atomic<time_t> defrost_start_time = 0;
 inline std::atomic<time_t> defrost_button_press_start_time{0};
 inline std::atomic<time_t> defrost_last_time{time(nullptr)};
 inline std::atomic<time_t> compressor_last_stop_time{time(nullptr) - 400};
-inline std::atomic<bool> anti_timer{false};
 inline std::atomic<time_t> alarm_reset_button_press_start_time{0};
 inline std::atomic<time_t> state_timer{0};
+inline std::atomic<time_t> pretrip_stage_start = 0;
+inline std::atomic<int> pretrip_stage{0};
 
 // Status map
 inline std::map<std::string, std::string> status = {
@@ -89,6 +92,7 @@ void heating_mode();
 void defrost_mode();
 void display_all_variables();
 void ws8211_system_thread();
+void pretrip_mode();
 void signalHandler(int signal);
 void interruptible_sleep(int total_seconds);
 

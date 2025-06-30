@@ -75,8 +75,6 @@ void Alarm::addAlarmCode(int code) {
 }
 
 bool Alarm::alarmAnyStatus() const {
-    for (int code : alarmCodes) std::cout << code << " ";
-    std::cout << std::endl;
     return isShutdownAlarm || isWarningAlarm;
 }
 
