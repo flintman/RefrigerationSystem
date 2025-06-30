@@ -247,6 +247,11 @@ private:
 };
 
 int main(int argc, char* argv[]) {
+    if (geteuid() != 0) {
+        std::cerr << "This tool must be run as root (sudo).\n";
+        return 1;
+    }
+
     const char* defaultConfig = "/etc/refrigeration/config.env";
     if (argc != 2) {
         // Check if default config exists

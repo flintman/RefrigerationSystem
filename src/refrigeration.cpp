@@ -670,6 +670,11 @@ void signalHandler(int signal) {
 int main(int argc, char* argv[]) {
     std::signal(SIGINT, signalHandler);
 
+    if (geteuid() != 0) {
+        std::cerr << "This tool must be run as root (sudo).\n";
+        return 1;
+    }
+
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
         if (arg == "demo_mode=true" || arg == "--demo" || arg == "-d") {
