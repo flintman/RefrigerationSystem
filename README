@@ -28,6 +28,8 @@ as long as you are connected.
     Warning Alarms
         2002 - Supply Sensor Failure - Outside of the range
 
+        9000 - Pretrip Passed
+
 
 ####### Demo Mode #######
 Set the setpoint to 80F and press and hold the defrost button for 10 sec.  This will toggle it in and out of Demo Mode.  This will simulate cooling, heating, defrost, etc to test the equipment and see how it works.

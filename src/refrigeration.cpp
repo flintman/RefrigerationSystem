@@ -744,6 +744,8 @@ void pretrip_mode() {
             null_mode();
             pretrip_enable = false;
             pretrip_stage = 0;
+            systemAlarm.activateAlarm(0, "9000: Pretrip Completed successfully.");
+            systemAlarm.addAlarmCode(9000);
             logger.log_events("Debug", "Pretrip: Completed");
             return;
     }
