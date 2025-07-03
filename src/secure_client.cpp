@@ -27,7 +27,7 @@ SecureClient::SecureClient(const std::string& server_ip,
 void SecureClient::connect() {
     cleanup();
 
-   logger.log_events("Debug", "Attempting to connect to " + server_ip_ + ":" + std::to_string(port_));
+    logger.log_events("Debug", "Attempting to connect to " + server_ip_ + ":" + std::to_string(port_));
 
     struct sockaddr_in server_addr{};
     socket_fd_ = socket(AF_INET, SOCK_STREAM, 0);
@@ -36,16 +36,52 @@ void SecureClient::connect() {
         return;
     }
 
+    // Set socket to non-blocking
+    int flags = fcntl(socket_fd_, F_GETFL, 0);
+    if (flags < 0) flags = 0;
+    fcntl(socket_fd_, F_SETFL, flags | O_NONBLOCK);
+
     server_addr.sin_family = AF_INET;
     server_addr.sin_port = htons(port_);
     inet_pton(AF_INET, server_ip_.c_str(), &server_addr.sin_addr);
 
-    if (::connect(socket_fd_, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0) {
-        logger.log_events("Error", "Connection failed. Retrying in " + std::to_string(reconnect_delay_) + " seconds...");
-        close(socket_fd_);
-        std::this_thread::sleep_for(std::chrono::seconds(reconnect_delay_));
-        return;
+    int result = ::connect(socket_fd_, (struct sockaddr*)&server_addr, sizeof(server_addr));
+    if (result < 0) {
+        if (errno == EINPROGRESS) {
+            fd_set writefds;
+            FD_ZERO(&writefds);
+            FD_SET(socket_fd_, &writefds);
+            struct timeval tv;
+            tv.tv_sec = 5; // 5 seconds timeout
+            tv.tv_usec = 0;
+
+            int sel = select(socket_fd_ + 1, nullptr, &writefds, nullptr, &tv);
+            if (sel > 0 && FD_ISSET(socket_fd_, &writefds)) {
+                int so_error = 0;
+                socklen_t len = sizeof(so_error);
+                getsockopt(socket_fd_, SOL_SOCKET, SO_ERROR, &so_error, &len);
+                if (so_error != 0) {
+                    logger.log_events("Error", "Connection failed (SO_ERROR). Retrying in " + std::to_string(reconnect_delay_) + " seconds...");
+                    close(socket_fd_);
+                    std::this_thread::sleep_for(std::chrono::seconds(reconnect_delay_));
+                    return;
+                }
+            } else {
+                logger.log_events("Error", "Connection timed out. Retrying in " + std::to_string(reconnect_delay_) + " seconds...");
+                close(socket_fd_);
+                std::this_thread::sleep_for(std::chrono::seconds(reconnect_delay_));
+                return;
+            }
+        } else {
+            logger.log_events("Error", "Connection failed. Retrying in " + std::to_string(reconnect_delay_) + " seconds...");
+            close(socket_fd_);
+            std::this_thread::sleep_for(std::chrono::seconds(reconnect_delay_));
+            return;
+        }
     }
+
+    // Restore socket to blocking mode
+    fcntl(socket_fd_, F_SETFL, flags);
 
     ssl_ = SSL_new(ctx_);
     SSL_set_fd(ssl_, socket_fd_);
