@@ -17,7 +17,9 @@ ConfigValidator::ConfigValidator() {
         {"debug.enable_send_data",   {"0", ConfigType::Boolean}},
         {"sensor.return",   {"0", ConfigType::Integer}},
         {"sensor.supply",   {"0", ConfigType::Integer}},
-        {"sensor.coil",   {"0", ConfigType::Integer}}
+        {"sensor.coil",   {"0", ConfigType::Integer}},
+        {"client.ip_address",   {"192.168.1.1", ConfigType::String}},
+        {"client.sent_sec",   {"900", ConfigType::Integer}}
     };
 }
 

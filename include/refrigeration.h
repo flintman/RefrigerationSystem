@@ -55,7 +55,9 @@ inline std::map<std::string, std::string> status = {
 };
 
 // Managers and hardware
+
 inline ConfigManager cfg(config_file_name);
+inline std::string ip_address = cfg.get("client.ip_address");
 inline GpioManager gpio;
 inline ADS1115 adc;
 inline WS2811Controller ws2811(2, 18);
@@ -67,7 +69,7 @@ inline Logger logger(stoi(cfg.get("debug.code")));
 inline WiFiManager wifi_manager;
 inline Alarm systemAlarm;
 inline DemoRefrigeration demo;
-inline SecureClient secure_client;
+inline SecureClient secure_client(ip_address);
 
 // Sensor data
 inline std::atomic<float>  return_temp = -327.0f;

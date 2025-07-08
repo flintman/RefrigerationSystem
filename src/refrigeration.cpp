@@ -22,6 +22,10 @@ void display_all_variables() {
     std::cout << "Debug Code: " << cfg.get("debug.code") << "\n";
     std::cout << "Debug Data Sending: " << (cfg.get("debug.enable_send_data") == "1" ? "Enabled" : "Disabled") << "\n";
     std::cout << "return: " << cfg.get("sensor.return") << "\n";
+    std::cout << "wifi.enable_hotspot: " << cfg.get("wifi.enable_hotspot") << "\n";
+    std::cout << "wifi.hotspot_password: " << cfg.get("wifi.hotspot_password") << "\n";
+    std::cout << "client.sent_sec: " << cfg.get("client.sent_sec") << "\n";
+    std::cout << "client.ip_address: " << cfg.get("client.ip_address") << "\n";
     std::cout << "coil: " << cfg.get("sensor.coil") << "\n";
     std::cout << "supply: " << cfg.get("sensor.supply") << "\n";
     std::cout << "  HAVE A NICE DAY AND LET ME KNOW IF YOU NEED HELP \n";
@@ -591,7 +595,7 @@ void secureclient_loop() {
     std::this_thread::sleep_for(std::chrono::seconds(10));
 
     while (running) {
-        int secureclient_timer = 900;
+        int secureclient_timer = std::stoi(cfg.get("client.sent_sec"));
         std::map<std::string, std::string> command;
         return_temp_ = return_temp;
         supply_temp_ = supply_temp;

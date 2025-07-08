@@ -10,7 +10,7 @@
 
 class SecureClient {
 public:
-    SecureClient(const std::string& server_ip = "72.70.48.6",
+    SecureClient(const std::string& server_ip = "192.168.1.1",
                  int port = 5001, const std::string& cert_file = "/etc/refrigeration/cert.pem");
 
     void connect();
