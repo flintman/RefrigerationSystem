@@ -48,7 +48,7 @@ void check_sensor_status(float return_temp, float supply_temp, float coil_temp) 
 
 void update_sensor_thread() {
     using namespace std::chrono;
-    std::this_thread::sleep_for(milliseconds(200)); // Wait for system to load
+    std::this_thread::sleep_for(milliseconds(500)); // Wait for system to load
 
     while (running) {
         float local_return_temp, local_supply_temp, local_coil_temp, local_setpoint;
@@ -796,14 +796,33 @@ int main(int argc, char* argv[]) {
             system("systemctl stop refrigeration.service");
             return 0;
         } else {
-            std::thread refrigeration_thread(update_sensor_thread);
-            std::thread setpoint_thread(setpoint_system_thread);
-            std::thread display_system(display_system_thread);
-            std::thread ws8211_system(ws8211_system_thread);
-            std::thread button_system(button_system_thread);
-            std::thread hotspot_system(hotspot_start);
-            std::thread alarm_system(checkAlarms_system);
-            std::thread secureclient_system(secureclient_loop);
+            // Thread wrappers and monitoring
+            auto start_thread = [](std::function<void()> func, const std::string& name) -> std::thread {
+                return std::thread([func, name]() {
+                    while (running) {
+                        try {
+                            func();
+                            // If function returns, log and restart unless running is false
+                            if (running) {
+                                logger.log_events("Error", name + " thread exited unexpectedly, restarting...");
+                            }
+                        } catch (const std::exception& e) {
+                            logger.log_events("Error", name + " thread exception: " + e.what());
+                        }
+                        if (name == "hotspot_system") break; // Don't restart hotspot thread
+                        std::this_thread::sleep_for(std::chrono::seconds(1));
+                    }
+                });
+            };
+
+            std::thread refrigeration_thread = start_thread(update_sensor_thread, "refrigeration_thread");
+            std::thread setpoint_thread = start_thread(setpoint_system_thread, "setpoint_thread");
+            std::thread display_system = start_thread(display_system_thread, "display_system_thread");
+            std::thread ws8211_system = start_thread(ws8211_system_thread, "ws8211_system_thread");
+            std::thread button_system = start_thread(button_system_thread, "button_system_thread");
+            std::thread hotspot_system(hotspot_start); // Hotspot: do not restart
+            std::thread alarm_system = start_thread(checkAlarms_system, "alarm_system_thread");
+            std::thread secureclient_system = start_thread(secureclient_loop, "secureclient_system_thread");
 
             refrigeration_thread.join();
             setpoint_thread.join();
