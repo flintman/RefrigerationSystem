@@ -256,6 +256,8 @@ void display_system_thread() {
     float coil_temp_;
     std::string status_;
     float setpoint_;
+    display1.initiate();
+    display2.initiate();
 
     while (running) {
         return_temp_ = return_temp;

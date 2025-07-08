@@ -5,34 +5,42 @@
 #include <mutex>
 
 // SMBusDevice implementation
-SMBusDevice::SMBusDevice(const char* bus, uint8_t addr) : address(addr) {
-    if ((fd = open(bus, O_RDWR)) < 0) {
+SMBusDevice::SMBusDevice(const char *bus, uint8_t addr) : address(addr)
+{
+    if ((fd = open(bus, O_RDWR)) < 0)
+    {
         throw std::runtime_error("Failed to open I2C bus");
     }
 
-    if (ioctl(fd, I2C_SLAVE, address) < 0) {
+    if (ioctl(fd, I2C_SLAVE, address) < 0)
+    {
         close(fd);
         throw std::runtime_error("Failed to acquire bus access");
     }
 }
 
-SMBusDevice::~SMBusDevice() {
+SMBusDevice::~SMBusDevice()
+{
     close(fd);
 }
 
-void SMBusDevice::smbusWriteByte(uint8_t reg, uint8_t value) {
+void SMBusDevice::smbusWriteByte(uint8_t reg, uint8_t value)
+{
     uint8_t buffer[2] = {reg, value};
-    if (write(fd, buffer, 2) != 2) {
+    if (write(fd, buffer, 2) != 2)
+    {
         throw std::runtime_error("SMBus write failed");
     }
 }
 
-void SMBusDevice::smbusWriteBlock(uint8_t reg, const uint8_t* data, uint8_t length) {
-    uint8_t* buffer = new uint8_t[length + 1];
+void SMBusDevice::smbusWriteBlock(uint8_t reg, const uint8_t *data, uint8_t length)
+{
+    uint8_t *buffer = new uint8_t[length + 1];
     buffer[0] = reg;
     memcpy(buffer + 1, data, length);
 
-    if (write(fd, buffer, length + 1) != length + 1) {
+    if (write(fd, buffer, length + 1) != length + 1)
+    {
         delete[] buffer;
         throw std::runtime_error("SMBus block write failed");
     }
@@ -40,25 +48,32 @@ void SMBusDevice::smbusWriteBlock(uint8_t reg, const uint8_t* data, uint8_t leng
 }
 
 // TCA9548A implementation
-TCA9548A_SMBus::TCA9548A_SMBus(const char* bus, uint8_t address)
+TCA9548A_SMBus::TCA9548A_SMBus(const char *bus, uint8_t address)
     : SMBusDevice(bus, address) {}
 
-void TCA9548A_SMBus::selectChannel(uint8_t channel) {
-    if (channel > 7) throw std::out_of_range("Channel must be 0-7");
+void TCA9548A_SMBus::selectChannel(uint8_t channel)
+{
+    if (channel > 7)
+        throw std::out_of_range("Channel must be 0-7");
     smbusWriteByte(0, 1 << channel);
     usleep(200);
 }
 
-void TCA9548A_SMBus::disableAllChannels() {
+void TCA9548A_SMBus::disableAllChannels()
+{
     smbusWriteByte(0, 0x00);
 }
 
 // LCD2004 implementation
 LCD2004_SMBus::LCD2004_SMBus(std::shared_ptr<TCA9548A_SMBus> multiplexer,
-                            uint8_t ch,
-                            uint8_t address)
-    : SMBusDevice("/dev/i2c-1", address), mux(multiplexer), channel(ch), backlightState(true) {
+                             uint8_t ch,
+                             uint8_t address)
+    : SMBusDevice("/dev/i2c-1", address), mux(multiplexer), channel(ch), backlightState(true)
+{
+}
 
+void LCD2004_SMBus::initiate()
+{
     mux->selectChannel(channel);
     usleep(5000);
 
@@ -82,22 +97,28 @@ LCD2004_SMBus::LCD2004_SMBus(std::shared_ptr<TCA9548A_SMBus> multiplexer,
     send(0x06, LCD_CMD);
 
     // Initialize line buffers
-    for (auto& line : currentLines) {
+    for (auto &line : currentLines)
+    {
         line.fill(' ');
     }
 }
 
-LCD2004_SMBus::~LCD2004_SMBus() {
-    try {
+LCD2004_SMBus::~LCD2004_SMBus()
+{
+    try
+    {
         mux->selectChannel(channel);
         clear();
         backlight(false);
-    } catch (...) {
+    }
+    catch (...)
+    {
         // Suppress errors during destruction
     }
 }
 
-void LCD2004_SMBus::write4bits(uint8_t value) {
+void LCD2004_SMBus::write4bits(uint8_t value)
+{
     uint8_t data[1];
     data[0] = value | LCD_ENABLE | (backlightState ? LCD_BACKLIGHT : 0);
     smbusWriteBlock(0, data, 1);
@@ -108,7 +129,8 @@ void LCD2004_SMBus::write4bits(uint8_t value) {
     usleep(10);
 }
 
-void LCD2004_SMBus::send(uint8_t value, uint8_t mode) {
+void LCD2004_SMBus::send(uint8_t value, uint8_t mode)
+{
     uint8_t highnib = value & 0xF0;
     uint8_t lownib = (value << 4) & 0xF0;
 
@@ -118,55 +140,68 @@ void LCD2004_SMBus::send(uint8_t value, uint8_t mode) {
     usleep(5);
 }
 
-void LCD2004_SMBus::clear() {
+void LCD2004_SMBus::clear()
+{
     mux->selectChannel(channel);
     send(0x01, LCD_CMD);
     usleep(200);
 
     // Reset line buffers
-    for (auto& line : currentLines) {
+    for (auto &line : currentLines)
+    {
         line.fill(' ');
     }
 }
 
-void LCD2004_SMBus::setCursor(uint8_t col, uint8_t row) {
+void LCD2004_SMBus::setCursor(uint8_t col, uint8_t row)
+{
     const uint8_t row_offsets[] = {0x00, 0x40, 0x14, 0x54};
-    if (row > 3) row = 3;
+    if (row > 3)
+        row = 3;
     send(0x80 | (col + row_offsets[row]), LCD_CMD);
 }
 
-void LCD2004_SMBus::display(const std::string& text, uint8_t line) {
-    if (line >= 4) return;
+void LCD2004_SMBus::display(const std::string &text, uint8_t line)
+{
+    if (line >= 4)
+        return;
 
     // Check if update is needed
     bool needsUpdate = false;
     size_t i = 0;
-    for (; i < text.size() && i < 20; i++) {
-        if (currentLines[line][i] != text[i]) {
+    for (; i < text.size() && i < 20; i++)
+    {
+        if (currentLines[line][i] != text[i])
+        {
             needsUpdate = true;
             currentLines[line][i] = text[i];
         }
     }
 
     // Check if clearing is needed
-    for (; i < 20; i++) {
-        if (currentLines[line][i] != ' ') {
+    for (; i < 20; i++)
+    {
+        if (currentLines[line][i] != ' ')
+        {
             needsUpdate = true;
             currentLines[line][i] = ' ';
         }
     }
 
-    if (!needsUpdate) return;
+    if (!needsUpdate)
+        return;
 
     mux->selectChannel(channel);
     setCursor(0, line);
 
-    for (size_t i = 0; i < 20; i++) {
+    for (size_t i = 0; i < 20; i++)
+    {
         send(currentLines[line][i], LCD_DATA);
     }
 }
 
-void LCD2004_SMBus::backlight(bool on) {
+void LCD2004_SMBus::backlight(bool on)
+{
     backlightState = on;
     mux->selectChannel(channel);
     uint8_t data[1] = {on ? LCD_BACKLIGHT : 0x00};
