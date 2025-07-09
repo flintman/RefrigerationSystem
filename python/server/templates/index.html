@@ -3,17 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CJJ Trailer Data Viewer</title>
+    <title>Refrigeration Data Viewer</title>
     <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
 
-    <h1>CJJ Trailer Data Viewer</h1>
-    <h2>Available Trailers</h2>
+    <h1>Refrigeration Data Viewer</h1>
+    <h2>Available Units</h2>
     <table>
         <thead>
             <tr>
-                <th>Trailer Number</th>
+                <th>Unit Number</th>
                 <th>Latest Log Timestamp</th>
                 <th>Latest Alarm</th>
             </tr>
@@ -37,7 +37,7 @@
     </table>
 
     <div id="data-container">
-        <h2>Trailer Data</h2>
+        <h2>Unit Data</h2>
         <button id="download-btn">Download Excel</button>
         <div id="download-message">Getting download ready...</div>
         <div id="command-buttons" style="margin: 10px 0;">
@@ -63,7 +63,7 @@
                 </tr>
             </thead>
             <tbody id="trl-data-body">
-                <tr><td colspan="11">Click on a TRL number to view data.</td></tr>
+                <tr><td colspan="11">Click on a Unit number to view data.</td></tr>
             </tbody>
         </table>
     </div>
