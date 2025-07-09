@@ -1,11 +1,25 @@
-CROSS_PREFIX = arm-linux-gnueabihf-
-ARCH = arm-linux-gnueabihf
+# Allow override from environment or command line
+CROSS_PREFIX ?=
+ARCH ?= native
+
+# Auto-detect architecture if not set
+ifeq ($(ARCH),native)
+UNAME_M := $(shell uname -m)
+ifeq ($(UNAME_M),x86_64)
+ARCH := arm-linux-gnueabihf
+CROSS_PREFIX := arm-linux-gnueabihf-
+endif
+ifeq ($(UNAME_M),aarch64)
+ARCH :=
+CROSS_PREFIX :=
+endif
+endif
 
 # Compiler and flags
 CXX = $(CROSS_PREFIX)g++
 CC = $(CROSS_PREFIX)gcc
-CXXFLAGS = -std=c++17 -Wall -g -Iinclude -I$(ARCH)/include -Ivendor/ws2811 -Ivendor/openssl/include -mfpu=neon-vfpv4 -march=armv7-a -mtune=cortex-a7
-CFLAGS = -Wall -g -Iinclude -Ivendor/ws2811 -Ivendor/openssl/include -mfpu=neon-vfpv4 -march=armv7-a -mtune=cortex-a7
+CXXFLAGS = -std=c++17 -Wall -g -Iinclude -I$(ARCH)/include -Ivendor/ws2811 -Ivendor/openssl/include
+CFLAGS = -Wall -g -Iinclude -Ivendor/ws2811 -Ivendor/openssl/include
 LDFLAGS = -L$(ARCH)/lib -Lvendor/openssl/lib -Wl,-rpath=$(ARCH)/lib -Wl,-rpath=vendor/openssl/lib -static-libstdc++ -static-libgcc
 LDFLAGS += -static -lm
 
