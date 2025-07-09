@@ -1,1 +1,4 @@
 build/
+python/server/received_data/
+python/server/blocked_ips.json
+python/server/.env

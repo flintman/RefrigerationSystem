@@ -12,6 +12,7 @@ from email.mime.multipart import MIMEMultipart
 import time
 import pandas as pd
 from flask import Flask, render_template, session, redirect, url_for, jsonify, send_file, request
+from dotenv import load_dotenv
 
 BLOCKED_IPS_FILE = "blocked_ips.json"
 DATA_DIRECTORY = "received_data"
@@ -29,9 +30,10 @@ class SecureServer:
         self.host = host
         self.port = port
         self.web_port = web_port
-        self.email_server = "mail.bellavance.co"
-        self.email_address = "william@bellavance.co"
-        self.email_password = ""
+        load_dotenv()
+        self.email_server = os.getenv("EMAIL_SERVER", "")
+        self.email_address = os.getenv("EMAIL_ADDRESS", "")
+        self.email_password = os.getenv("EMAIL_PASSWORD", "")
         self.cert_file = cert_file
         self.key_file = key_file
         self.server_socket = None
