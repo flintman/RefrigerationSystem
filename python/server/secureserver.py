@@ -283,10 +283,6 @@ class SecureServer:
             System Status:
             - Setpoint: {data.get("setpoint", "N/A")}
             - Status: {data.get("status", "N/A")}
-            - Compressor: {"ON" if data.get("compressor") else "OFF"}
-            - Fan: {"ON" if data.get("fan") else "OFF"}
-            - Valve: {"ON" if data.get("valve") else "OFF"}
-            - Electric Heater: {"ON" if data.get("electric_heater") else "OFF"}
             - Return Temp: {data.get("return_temp", "N/A")}°F
             - Supply Temp: {data.get("supply_temp", "N/A")}°F
             - Coil Temp: {data.get("coil_temp", "N/A")}°F

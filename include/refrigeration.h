@@ -83,6 +83,8 @@ inline int log_interval = stoi(cfg.get("logging.interval_sec"));
 extern time_t last_log_timestamp;
 
 // Function declarations
+bool secure_client_send();
+void secureclient_loop();
 void refrigeration_system(float return_temp_, float supply_temp_, float coil_temp_, float setpoint_);
 void display_system_thread();
 void setpoint_system_thread();

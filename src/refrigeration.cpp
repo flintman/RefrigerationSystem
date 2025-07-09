@@ -170,6 +170,7 @@ void alarm_mode() {
         logger.log_events("Debug", "System Status: " + status["status"]);
     }
     update_gpio_from_status();
+    secure_client_send(); // Send alarm status to server
 }
 
 void update_gpio_from_status() {
@@ -445,10 +446,8 @@ void checkDefrostPin() {
             double press_duration = now - defrost_button_press_start_time;
             defrost_button_press_start_time = 0;
 
-            logger.log_events("Debug", "Defrost Button released in " + std::to_string(press_duration));
-
             int setpoint_int = static_cast<int>(setpoint.load());
-            logger.log_events("Debug", "Defrost Button released in " + std::to_string(press_duration) + "setpoint_int: " + std::to_string(setpoint_int));
+            logger.log_events("Debug", "Defrost Button released in " + std::to_string(press_duration) + "  setpoint_int: " + std::to_string(setpoint_int));
             if (press_duration >= 5 && setpoint_int == 65) {
                 if(!pretrip_enable) {
                     pretrip_enable = true;
@@ -583,7 +582,28 @@ void checkAlarms_system(){
     }
 }
 
-void secureclient_loop() {
+void secureclient_loop(){
+    int secureclient_timer = std::stoi(cfg.get("client.sent_sec"));
+    bool resend = false;
+    std::this_thread::sleep_for(std::chrono::seconds(10)); // Wait for system to load
+    while (running) {
+        if (cfg.get("debug.enable_send_data") == "1") {
+            resend = secure_client_send();
+            if (resend) {
+                logger.log_events("Debug", "Resending data due to command received.");
+                interruptible_sleep(10); // Wait before next send
+                resend = secure_client_send();
+            } else {
+                logger.log_events("Debug", "Data sent successfully, no command received.");
+            }
+        } else {
+            logger.log_events("Debug", "Data sending is disabled. Skipping secure client send.");
+        }
+        interruptible_sleep(secureclient_timer);
+    }
+}
+
+bool secure_client_send() { // returns if we need to resend
     float return_temp_;
     float supply_temp_;
     float coil_temp_;
@@ -592,93 +612,86 @@ void secureclient_loop() {
     std::string status_fan;
     std::string status_valve;
     std::string status_electric_heater;
+    bool resend = false;
     float setpoint_;
-    using namespace std::chrono_literals;
-    std::this_thread::sleep_for(std::chrono::seconds(10));
 
-    while (running) {
-        int secureclient_timer = std::stoi(cfg.get("client.sent_sec"));
-        std::map<std::string, std::string> command;
-        return_temp_ = return_temp;
-        supply_temp_ = supply_temp;
-        coil_temp_ = coil_temp;
-        setpoint_ = setpoint.load();
-        {
-            std::lock_guard<std::mutex> lock(status_mutex);
-            status_ = status["status"];
-            status_compresor = status["compressor"];
-            status_fan = status["fan"];
-            status_valve = status["valve"];
-            status_electric_heater = status["electric_heater"];
-        }
-
-        try {
-            if (cfg.get("debug.enable_send_data") == "1") {
-                // Get timestamp
-                auto now = std::chrono::system_clock::now();
-                std::time_t now_c = std::chrono::system_clock::to_time_t(now);
-                char timestamp[32];
-                std::strftime(timestamp, sizeof(timestamp), "%H:%M:%S  %m:%d:%Y", std::localtime(&now_c));
-
-                // Convert alarm codes to comma-separated string
-                auto codes = systemAlarm.getAlarmCodes();
-                std::ostringstream codes_ss;
-                for (size_t i = 0; i < codes.size(); ++i) {
-                    codes_ss << codes[i];
-                    if (i + 1 < codes.size()) codes_ss << ",";
-                }
-
-                std::ostringstream setpoint_ss, return_ss, supply_ss, coil_ss;
-                setpoint_ss << std::fixed << std::setprecision(0) << setpoint_;
-                return_ss   << std::fixed << std::setprecision(1) << return_temp_;
-                supply_ss   << std::fixed << std::setprecision(1) << supply_temp_;
-                coil_ss     << std::fixed << std::setprecision(1) << coil_temp_;
-
-                std::map<std::string, std::string> array = {
-                    {"timestamp", timestamp},
-                    {"trl", cfg.get("trl.number")},
-                    {"alarm_codes", codes_ss.str()},
-                    {"setpoint", setpoint_ss.str()},
-                    {"status", status_},
-                    {"compressor", status_compresor},
-                    {"fan", status_fan},
-                    {"valve", status_valve},
-                    {"electric_heater", status_electric_heater},
-                    {"return_temp", return_ss.str()},
-                    {"supply_temp", supply_ss.str()},
-                    {"coil_temp", coil_ss.str()}
-                };
-
-                if (wifi_manager.is_connected()) {
-                    try {
-                        secure_client.connect();
-                        command = secure_client.send_and_receive(array);
-                        logger.log_events("Debug", "Sent data, response received.");
-                    } catch (const std::exception& e) {
-                        logger.log_events("Error", std::string("Error in send/receive: ") + e.what());
-                    }
-                } else {
-                    logger.log_events("Debug", "No active internet connection. Function execution skipped.");
-                }
-            }
-        } catch (const std::exception& e) {
-            logger.log_events("Error", std::string("secureclient_loop encountered an error: ") + e.what());
-        }
-
-        // Handle command
-        if (!command.empty()) {
-            if (command["status"] == "alarm_reset") {
-                systemAlarm.resetAlarm();
-                secureclient_timer = 5;
-            } else if (command["status"] == "defrost") {
-                trigger_defrost = true;
-                secureclient_timer = 5;
-            }
-            interruptible_sleep(5);
-        }
-
-        interruptible_sleep(secureclient_timer);
+    int secureclient_timer = std::stoi(cfg.get("client.sent_sec"));
+    std::map<std::string, std::string> command;
+    return_temp_ = return_temp;
+    supply_temp_ = supply_temp;
+    coil_temp_ = coil_temp;
+    setpoint_ = setpoint.load();
+    {
+        std::lock_guard<std::mutex> lock(status_mutex);
+        status_ = status["status"];
+        status_compresor = status["compressor"];
+        status_fan = status["fan"];
+        status_valve = status["valve"];
+        status_electric_heater = status["electric_heater"];
     }
+
+    try {
+        // Get timestamp
+        auto now = std::chrono::system_clock::now();
+        std::time_t now_c = std::chrono::system_clock::to_time_t(now);
+        char timestamp[32];
+        std::strftime(timestamp, sizeof(timestamp), "%H:%M:%S  %m:%d:%Y", std::localtime(&now_c));
+
+        // Convert alarm codes to comma-separated string
+        auto codes = systemAlarm.getAlarmCodes();
+        std::ostringstream codes_ss;
+        for (size_t i = 0; i < codes.size(); ++i) {
+            codes_ss << codes[i];
+            if (i + 1 < codes.size()) codes_ss << ",";
+        }
+
+        std::ostringstream setpoint_ss, return_ss, supply_ss, coil_ss;
+        setpoint_ss << std::fixed << std::setprecision(0) << setpoint_;
+        return_ss   << std::fixed << std::setprecision(1) << return_temp_;
+        supply_ss   << std::fixed << std::setprecision(1) << supply_temp_;
+        coil_ss     << std::fixed << std::setprecision(1) << coil_temp_;
+
+        std::map<std::string, std::string> array = {
+            {"timestamp", timestamp},
+            {"trl", cfg.get("trl.number")},
+            {"alarm_codes", codes_ss.str()},
+            {"setpoint", setpoint_ss.str()},
+            {"status", status_},
+            {"compressor", status_compresor},
+            {"fan", status_fan},
+            {"valve", status_valve},
+            {"electric_heater", status_electric_heater},
+            {"return_temp", return_ss.str()},
+            {"supply_temp", supply_ss.str()},
+            {"coil_temp", coil_ss.str()}
+        };
+
+        if (wifi_manager.is_connected()) {
+            try {
+                secure_client.connect();
+                command = secure_client.send_and_receive(array);
+                logger.log_events("Debug", "Sent data, response received.");
+            } catch (const std::exception& e) {
+                logger.log_events("Error", std::string("Error in send/receive: ") + e.what());
+            }
+        } else {
+            logger.log_events("Debug", "No active internet connection. Function execution skipped.");
+        }
+    } catch (const std::exception& e) {
+        logger.log_events("Error", std::string("secureclient_loop encountered an error: ") + e.what());
+    }
+
+    // Handle command
+    if (!command.empty()) {
+        if (command["status"] == "alarm_reset") {
+            resend = true;
+            systemAlarm.resetAlarm();
+        } else if (command["status"] == "defrost") {
+            resend = true;
+            trigger_defrost = true;
+        }
+    }
+    return resend;
 }
 
 void pretrip_mode() {
