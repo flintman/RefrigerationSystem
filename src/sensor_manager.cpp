@@ -26,17 +26,17 @@ void SensorManager::readOneWireTempSensors() {
         // Read all files in directory
         while ((ent = readdir(dir)) != nullptr) {
             std::string name = ent->d_name;
-            
+
             // Check if it's a temperature sensor (starts with 28-)
             if (name.find(sensorPrefix) == 0) {
                 std::string sensorPath = baseDir + name + "/w1_slave";
-                
+
                 // Open the sensor file
                 std::ifstream sensorFile(sensorPath);
                 if (sensorFile.is_open()) {
                     std::string line;
                     std::getline(sensorFile, line); // First line - check CRC
-                    
+
                     // Check if CRC is valid
                     if (line.find("YES") != std::string::npos) {
                         std::getline(sensorFile, line); // Second line - temperature
@@ -66,7 +66,8 @@ float SensorManager::readSensor(const std::string& sensor_id) {
 
     std::ifstream file(sensor_path);
     if (!file) {
-        throw std::runtime_error("Failed to open sensor: " + sensor_id);
+        std::cerr <<"Failed to open sensor: " << sensor_id;
+        return -327.0f; // Return an invalid temperature value
     }
 
     std::string line;
@@ -74,14 +75,16 @@ float SensorManager::readSensor(const std::string& sensor_id) {
     // First line - CRC check
     std::getline(file, line);
     if (line.find("YES") == std::string::npos) {
-        throw std::runtime_error("Invalid CRC for sensor: " + sensor_id);
+        std::cerr << "Invalid CRC for sensor: " << sensor_id << std::endl;
+        return -327.0f; // Return an invalid temperature value
     }
 
     // Second line - temperature value
     std::getline(file, line);
     size_t pos = line.find("t=");
     if (pos == std::string::npos) {
-        throw std::runtime_error("Temperature data not found for sensor: " + sensor_id);
+        std::cerr << "Temperature data not found for sensor: " << sensor_id << std::endl;
+        return -327.0f; // Return an invalid temperature value
     }
 
     // Extract and convert temperature value
