@@ -19,10 +19,10 @@
             </tr>
         </thead>
         <tbody>
-            {% for trl in trl_list %}
-                {% set latest_entry = trl_data[trl][-1] if trl in trl_data and trl_data[trl] else None %}
+            {% for unit in unit_list %}
+                {% set latest_entry = unit_data[unit][-1] if unit in unit_data and unit_data[unit] else None %}
                 <tr>
-                    <td><a href="#" onclick="loadData('{{ trl }}')">{{ trl }}</a></td>
+                    <td><a href="#" onclick="loadData('{{ unit }}')">{{ unit }}</a></td>
                     <td>{{ latest_entry["timestamp"].strftime('%Y-%m-%d %H:%M:%S') if latest_entry else 'N/A' }}</td>
                     <td>
                         {% if latest_entry and "alarm_codes" in latest_entry and latest_entry["alarm_codes"] %}
@@ -46,7 +46,7 @@
             <button id="defrost-btn">Defrost</button>
             <div id="command-status"></div>
         </div>
-        <table id="trl-data-table">
+        <table id="unit-data-table">
             <thead>
                 <tr>
                     <th>Timestamp</th>
@@ -62,25 +62,25 @@
                     <th>Alarm Codes</th>
                 </tr>
             </thead>
-            <tbody id="trl-data-body">
+            <tbody id="unit-data-body">
                 <tr><td colspan="11">Click on a Unit number to view data.</td></tr>
             </tbody>
         </table>
     </div>
     <script>
-        let selectedTrl = null;
+        let selectedUnit = null;
 
-        function loadData(trl) {
-            selectedTrl = trl;
-            document.querySelector("#data-container h2").textContent = `Trailer Data for ${trl}`;
+        function loadData(unit) {
+            selectedUnit = unit;
+            document.querySelector("#data-container h2").textContent = `Unit Data for ${unit}`;
             document.getElementById("command-buttons").style.display = "block";
 
-            fetch(`/trl/${trl}`)
+            fetch(`/unit/${unit}`)
                 .then(response => response.json())
                 .then(data => {
                     data.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 
-                    let tableBody = document.getElementById('trl-data-body');
+                    let tableBody = document.getElementById('unit-data-body');
                     tableBody.innerHTML = "";
 
                     if (data.length === 0) {
@@ -132,7 +132,7 @@
                 .catch(error => console.error('Error fetching data:', error));
         }
 
-        function updateTrailerList() {
+        function updateUnitList() {
             fetch("/")
                 .then(response => response.text())
                 .then(html => {
@@ -142,44 +142,44 @@
                     document.querySelector("table tbody").innerHTML = newTableBody;
                     sortTable();
                 })
-                .catch(error => console.error("Error updating trailer list:", error));
+                .catch(error => console.error("Error updating unit list:", error));
         }
 
-        // Refresh trailer list every 10 seconds
-        setInterval(updateTrailerList, 10000);
+        // Refresh Unit list every 10 seconds
+        setInterval(updateUnitList, 10000);
 
     </script>
     <script>
         document.getElementById("download-btn").addEventListener("click", function() {
-            if (selectedTrl) {
+            if (selectedUnit) {
                 let message = document.getElementById("download-message");
                 message.style.display = "block";
 
                 setTimeout(() => {
                     message.style.display = "none";
-                    window.location.href = `/download/${selectedTrl}`;
+                    window.location.href = `/download/${selectedUnit}`;
                 }, 4000);
             }
         });
         document.getElementById("reset-alarm-btn").addEventListener("click", function() {
-            if (selectedTrl) {
-                sendCommand(selectedTrl, "alarm_reset");
+            if (selectedUnit) {
+                sendCommand(selectedUnit, "alarm_reset");
                 const resetBtn = document.getElementById("reset-alarm-btn");
                 resetBtn.style.display = "none";
             }
         });
 
         document.getElementById("defrost-btn").addEventListener("click", function() {
-            if (selectedTrl) {
-                sendCommand(selectedTrl, "defrost");
-                    const defrostBtn = document.getElementById("defrost-btn");
+            if (selectedUnit) {
+                sendCommand(selectedUnit, "defrost");
+                const defrostBtn = document.getElementById("defrost-btn");
 
                     defrostBtn.style.display = "none";
             }
         });
 
-        function sendCommand(trl, command) {
-            fetch(`/command/${trl}`, {
+        function sendCommand(unit, command) {
+            fetch(`/command/${unit}`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -189,7 +189,7 @@
             .then(response => response.json())
             .then(data => {
                 let statusDiv = document.getElementById("command-status");
-                statusDiv.textContent = `Command ${command} sent to ${trl}`;
+                statusDiv.textContent = `Command ${command} sent to ${unit}`;
                 statusDiv.style.display = "block";
                 setTimeout(() => statusDiv.style.display = "none", 3000);
             })

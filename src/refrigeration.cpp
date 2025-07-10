@@ -13,7 +13,7 @@ void display_all_variables() {
     logger.log_events("Debug", "YOU NEED TO RUN 'sudo tech-tool' to initialize the sensors");
     std::cout << "Logging Interval: " << cfg.get("logging.interval_sec") << " seconds\n";
     std::cout << "Log Retention Period: " << cfg.get("logging.retention_period") << " days\n";
-    std::cout << "TRL Number: " << cfg.get("trl.number") << "\n";
+    std::cout << "UNIT Number: " << cfg.get("unit.number") << "\n";
     std::cout << "Defrost Interval: " << cfg.get("defrost.interval_hours") << " hours\n";
     std::cout << "Defrost Timeout: " << cfg.get("defrost.timeout_mins") << " minutes\n";
     std::cout << "Defrost Coil Temperature: " << cfg.get("defrost.coil_temperature") << "°F\n";
@@ -504,7 +504,7 @@ void button_system_thread() {
 void hotspot_start() {
     bool enable_hotspot_loop = false;
     int enable_hotspot = stoi(cfg.get("wifi.enable_hotspot"));
-    std::string ssid = "CJJ-LEASING-" + cfg.get("trl.number");
+    std::string ssid = "REFRIGERATION-" + cfg.get("unit.number");
     std::string hotspot_password = cfg.get("wifi.hotspot_password");
     if (enable_hotspot == 1) {
         wifi_manager.set_credentials(ssid, hotspot_password);
@@ -661,7 +661,7 @@ bool secure_client_send() { // returns if we need to resend
 
         std::map<std::string, std::string> array = {
             {"timestamp", timestamp},
-            {"trl", cfg.get("trl.number")},
+            {"unit", cfg.get("unit.number")},
             {"alarm_codes", codes_ss.str()},
             {"setpoint", setpoint_ss.str()},
             {"status", status_},

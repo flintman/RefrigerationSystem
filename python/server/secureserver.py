@@ -41,7 +41,7 @@ class SecureServer:
         self.max_attempts = max_attempts
         self.blocked_ips = self.load_blocked_ips()
         self.active_alarms = {}
-        self.trl_data = {}
+        self.unit_data = {}
         self.app = Flask(__name__)
         self.app.secret_key = os.urandom(24)
         self.pending_commands = {}
@@ -62,22 +62,22 @@ class SecureServer:
             json.dump(list(self.blocked_ips), f, indent=4)
 
     def load_data(self):
-        self.trl_data.clear()
+        self.unit_data.clear()
         for file in os.listdir(DATA_DIRECTORY):
             if file.endswith(".json"):
                 parts = file.split("_")
                 if len(parts) >= 2:
-                    trl = parts[0]
+                    unit = parts[0]
                     file_path = os.path.join(DATA_DIRECTORY, file)
-                    self._process_file(trl, file_path)
+                    self._process_file(unit, file_path)
 
-    def _process_file(self, trl, file_path):
+    def _process_file(self, unit, file_path):
         with open(file_path, "r") as f:
             data = json.load(f)
             if not isinstance(data, list):
                 return
-            if trl not in self.trl_data:
-                self.trl_data[trl] = []
+            if unit not in self.unit_data:
+                self.unit_data[unit] = []
             processed_records = []
             for record in data:
                 try:
@@ -86,8 +86,8 @@ class SecureServer:
                     processed_records.append(processed_record)
                 except ValueError:
                     log(f"Skipping invalid timestamp in {file_path}: {record['timestamp']}")
-            self.trl_data[trl].extend(processed_records)
-            self.trl_data[trl] = sorted(self.trl_data[trl], key=lambda x: x["timestamp"])
+            self.unit_data[unit].extend(processed_records)
+            self.unit_data[unit] = sorted(self.unit_data[unit], key=lambda x: x["timestamp"])
 
     def cleanup_old_data(self, days=30):
         cutoff_date = datetime.now() - timedelta(days=days)
@@ -208,30 +208,30 @@ class SecureServer:
                     log(f"Malformed data received from {addr}: {e}. Closing connection.")
                     break
 
-                if "trl" in received_array:
-                    trl = received_array.get("trl")
+                if "unit" in received_array:
+                    unit = received_array.get("unit")
                     self.append_data(received_array)
                     alarm_codes = set(received_array.get("alarm_codes", []))
                     response = {"status": "Received"}
-                    if trl in self.pending_commands:
-                        command = self.pending_commands[trl]
+                    if unit in self.pending_commands:
+                        command = self.pending_commands[unit]
                         response["status"] = command
-                        del self.pending_commands[trl]
-                        log(f"Sending command {command} to TRL {trl}")
+                        del self.pending_commands[unit]
+                        log(f"Sending command {command} to Unit {unit}")
                     if alarm_codes:
                         # Only send email if the alarm codes are different from the last sent
-                        prev_alarms = set(self.active_alarms.get(trl, []))
+                        prev_alarms = set(self.active_alarms.get(unit, []))
                         current_alarms = set(alarm_codes)
                         log(f"Debug: prev_alarms={prev_alarms}, current_alarms={current_alarms}")
                         if not prev_alarms or current_alarms != prev_alarms:
-                            log(f"Sending email for TRL {trl} with alarms: {alarm_codes}")
+                            log(f"Sending email for Unit {unit} with alarms: {alarm_codes}")
                             self.send_email(received_array)
-                            self.active_alarms[trl] = list(current_alarms)
+                            self.active_alarms[unit] = list(current_alarms)
                         else:
-                            log(f"Alarm for TRL {trl} with codes {alarm_codes} already sent. Skipping email.")
-                    elif trl in self.active_alarms:
-                        log(f"TRL {trl} alarms cleared. Ready for next alert.")
-                        del self.active_alarms[trl]
+                            log(f"Alarm for Unit {unit} with codes {alarm_codes} already sent. Skipping email.")
+                    elif unit in self.active_alarms:
+                        log(f"Unit {unit} alarms cleared. Ready for next alert.")
+                        del self.active_alarms[unit]
                     try:
                         conn.sendall(json.dumps(response).encode("utf-8"))
                         log(f"Sent to {addr}: {response}")
@@ -250,10 +250,10 @@ class SecureServer:
             log(f"Client {addr} disconnected.")
 
     def append_data(self, data):
-        trl_number = data.get("trl", "unknown")
+        unit_number = data.get("unit", "unknown")
         date_str = datetime.now().strftime("%Y-%m-%d")
-        filepath = os.path.join(DATA_DIRECTORY, f"{trl_number}_{date_str}.json")
-        log(f"Appending data for TRL {trl_number} to {filepath}")
+        filepath = os.path.join(DATA_DIRECTORY, f"{unit_number}_{date_str}.json")
+        log(f"Appending data for Unit {unit_number} to {filepath}")
         if os.path.exists(filepath):
             with open(filepath, "r") as f:
                 existing_data = json.load(f)
@@ -276,12 +276,12 @@ class SecureServer:
             alarm_codes = data.get("alarm_codes", [])
             if not alarm_codes:
                 return
-            trl = data.get("trl", "N/A")
+            unit = data.get("unit", "N/A")
             alarm_codes_str = ", ".join(map(str, alarm_codes))
             email_body = textwrap.dedent(f"""\
             **ALARM ALERT**
             Timestamp: {data.get("timestamp", "N/A")}
-            TRL Number: {trl}
+            Unit Number: {unit}
             Alarm Codes: {alarm_codes_str}
 
             System Status:
@@ -294,28 +294,28 @@ class SecureServer:
             msg = MIMEMultipart()
             msg["From"] = self.email_address
             msg["To"] = self.email_address
-            msg["Subject"] = f"ALARM: TRL {trl} Detected!"
+            msg["Subject"] = f"ALARM: Unit {unit} Detected!"
             msg.attach(MIMEText(email_body, "plain"))
             with smtplib.SMTP_SSL(self.email_server, 465) as server:
                 server.login(self.email_address, self.email_password)
                 server.sendmail(self.email_address, self.email_address, msg.as_string())
-            log(f"Email sent to {self.email_address} with TRL {trl} and Alarm Codes: {alarm_codes_str}")
+            log(f"Email sent to {self.email_address} with Unit {unit} and Alarm Codes: {alarm_codes_str}")
         except Exception as e:
             log(f"Failed to send email: {e}")
 
     def _init_web_routes(self):
         self.app.before_request(self._check_session_timeout)
         self.app.route("/", methods=["GET"])(self._web_index)
-        self.app.route("/trl/<trl>", methods=["GET"])(self._web_view_trl)
-        self.app.route("/download/<trl>", methods=["GET"])(self._web_download_trl)
-        self.app.route("/command/<trl>", methods=["POST"])(self._web_send_command)
+        self.app.route("/unit/<unit>", methods=["GET"])(self._web_view_unit)
+        self.app.route("/download/<unit>", methods=["GET"])(self._web_download_unit)
+        self.app.route("/command/<unit>", methods=["POST"])(self._web_send_command)
 
-    def _web_send_command(self, trl):
+    def _web_send_command(self, unit):
         if not request.json or "command" not in request.json:
             return jsonify({"status": "error", "message": "Invalid command"}), 400
         command = request.json["command"]
-        self.pending_commands[trl] = command
-        return jsonify({"status": "success", "message": f"Command {command} queued for {trl}"})
+        self.pending_commands[unit] = command
+        return jsonify({"status": "success", "message": f"Command {command} queued for {unit}"})
 
     def _check_session_timeout(self):
         if "logged_in" in session:
@@ -327,18 +327,18 @@ class SecureServer:
                 return redirect(url_for("_web_index"))
             session["last_activity"] = current_time
 
-    def get_trl_list(self):
-        return sorted(self.trl_data.keys())
+    def get_unit_list(self):
+        return sorted(self.unit_data.keys())
 
     def _web_index(self):
         self.load_data()
-        return render_template("index.html", trl_list=self.get_trl_list(), trl_data=self.trl_data)
+        return render_template("index.html", unit_list=self.get_unit_list(), unit_data=self.unit_data)
 
-    def _web_view_trl(self, trl):
-        return jsonify(self.trl_data.get(trl, []))
+    def _web_view_unit(self, unit):
+        return jsonify(self.unit_data.get(unit, []))
 
-    def _web_download_trl(self, trl):
-        data = self.trl_data.get(trl, [])
+    def _web_download_unit(self, unit):
+        data = self.unit_data.get(unit, [])
         if not data:
             return "No data available", 404
         df = pd.DataFrame(data)
@@ -346,7 +346,7 @@ class SecureServer:
         download_folder = "downloaded_data"
         os.makedirs(download_folder, exist_ok=True)
         timestamp = datetime.now().strftime("%m-%d-%Y-%H-%M-%S")
-        excel_filename = f"trl_{trl}_data_{timestamp}.xlsx"
+        excel_filename = f"unit_{unit}_data_{timestamp}.xlsx"
         excel_path = os.path.join(download_folder, excel_filename)
         df.to_excel(excel_path, index=False)
         return send_file(excel_path, as_attachment=True, mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
