@@ -20,7 +20,6 @@ ConfigManager::ConfigManager(const std::string& filepath)
 }
 
 ConfigManager::~ConfigManager() {
-    saveToDotEnv();
 }
 
 std::string ConfigManager::get(const std::string& key) const {

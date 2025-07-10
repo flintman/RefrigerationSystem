@@ -89,9 +89,6 @@ private:
             std::cin >> choiceStr;
 
             if (choiceStr == "0") {
-                if (confirmSave()) {
-                    manager.save();
-                }
                 break;
             }
 
@@ -115,7 +112,7 @@ private:
         std::cout << "=== Config Menu ===\n";
         std::cout << "1-" << manager.getSchema().size() << ". Edit configuration item\n";
         std::cout << "D. Reset config file to default\n\n";
-        std::cout << "0. Save and back to Main Menu\n";
+        std::cout << "0. Back to Main Menu\n";
         std::cout << "Enter your choice: ";
     }
 
@@ -224,9 +221,11 @@ private:
 
         if (input == "d") {
             manager.set(key, entry.defaultValue);
+            manager.save();
             std::cout << "Reset to default value.\n";
         } else if (input != "c") {
             if (manager.set(key, input)) {
+                manager.save();
                 std::cout << "Value updated successfully.\n";
             } else {
                 std::cout << "Invalid value for this configuration item.\n";
@@ -238,12 +237,6 @@ private:
         std::cin.get();
     }
 
-    bool confirmSave() {
-        std::cout << "\nSave changes to config file? (y/n): ";
-        char choice;
-        std::cin >> choice;
-        return (choice == 'y' || choice == 'Y');
-    }
 };
 
 int main(int argc, char* argv[]) {
