@@ -170,7 +170,6 @@ void alarm_mode() {
         logger.log_events("Debug", "System Status: " + status["status"]);
     }
     update_gpio_from_status();
-    secure_client_send(); // Send alarm status to server
 }
 
 void update_gpio_from_status() {
@@ -554,6 +553,7 @@ void checkAlarms_system(){
     std::string status_;
     float return_temp_;
     float supply_temp_;
+    static bool sent_alarm_status = false;
 
     while(running){
         return_temp_ = return_temp;
@@ -572,9 +572,15 @@ void checkAlarms_system(){
         if (systemAlarm.getShutdownStatus()) {
             if (status_ != "Alarm") {
                 alarm_mode();
+                if (!sent_alarm_status) {
+                    logger.log_events("Debug", "Alarm detected, Sending Data to the site.");
+                    bool resend = secure_client_send(); // Send alarm status to server
+                    sent_alarm_status = true;
+                }
             }
         } else {
             if (status_ == "Alarm") {
+                sent_alarm_status = false;
                 null_mode();
             }
         }
@@ -617,12 +623,14 @@ bool secure_client_send() { // returns if we need to resend
 
     int secureclient_timer = std::stoi(cfg.get("client.sent_sec"));
     std::map<std::string, std::string> command;
-    return_temp_ = return_temp;
-    supply_temp_ = supply_temp;
-    coil_temp_ = coil_temp;
-    setpoint_ = setpoint.load();
+
+    // Protect all shared/global variables with mutexes
     {
         std::lock_guard<std::mutex> lock(status_mutex);
+        return_temp_ = return_temp;
+        supply_temp_ = supply_temp;
+        coil_temp_ = coil_temp;
+        setpoint_ = setpoint.load();
         status_ = status["status"];
         status_compresor = status["compressor"];
         status_fan = status["fan"];
