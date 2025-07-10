@@ -219,10 +219,16 @@ class SecureServer:
                         del self.pending_commands[trl]
                         log(f"Sending command {command} to TRL {trl}")
                     if alarm_codes:
-                        if trl not in self.active_alarms or alarm_codes != self.active_alarms[trl]:
+                        # Only send email if the alarm codes are different from the last sent
+                        prev_alarms = set(self.active_alarms.get(trl, []))
+                        current_alarms = set(alarm_codes)
+                        log(f"Debug: prev_alarms={prev_alarms}, current_alarms={current_alarms}")
+                        if not prev_alarms or current_alarms != prev_alarms:
                             log(f"Sending email for TRL {trl} with alarms: {alarm_codes}")
                             self.send_email(received_array)
-                            self.active_alarms[trl] = alarm_codes
+                            self.active_alarms[trl] = list(current_alarms)
+                        else:
+                            log(f"Alarm for TRL {trl} with codes {alarm_codes} already sent. Skipping email.")
                     elif trl in self.active_alarms:
                         log(f"TRL {trl} alarms cleared. Ready for next alert.")
                         del self.active_alarms[trl]
@@ -242,8 +248,6 @@ class SecureServer:
                 log(f"Error shutting down connection with {addr}: {e}")
             conn.close()
             log(f"Client {addr} disconnected.")
-            if "trl" in locals():
-                self.active_alarms.pop(trl, None)
 
     def append_data(self, data):
         trl_number = data.get("trl", "unknown")
