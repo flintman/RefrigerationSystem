@@ -174,6 +174,9 @@ void alarm_mode() {
 
 void update_gpio_from_status() {
     std::lock_guard<std::mutex> lock(status_mutex);
+    if(cfg.get("unit.fan_continuous") == "1" && status["status"] != "Alarm") {
+        status["fan"] = "True"; // Force fan to be ON in continuous mode
+    }
     gpio.write("fan_pin", status["fan"] == "False");
     gpio.write("compressor_pin", status["compressor"] == "False");
     gpio.write("valve_pin", status["valve"] == "False");
