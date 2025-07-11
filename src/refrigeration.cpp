@@ -178,6 +178,7 @@ void update_gpio_from_status() {
     gpio.write("compressor_pin", status["compressor"] == "False");
     gpio.write("valve_pin", status["valve"] == "False");
     gpio.write("electric_heater_pin", status["electric_heater"] == "False");
+    update_compressor_on_time(status["compressor"]);
 }
 
 void refrigeration_system(float return_temp_, float supply_temp_, float coil_temp_, float setpoint_) {
@@ -248,6 +249,21 @@ void refrigeration_system(float return_temp_, float supply_temp_, float coil_tem
         pretrip_mode();
         return;
     }
+}
+
+void update_compressor_on_time(const std::string& new_status) {
+    if (last_compressor_status == "False" && new_status == "True") {
+        // Compressor just turned ON
+        compressor_on_start_time = time(nullptr);
+    } else if (last_compressor_status == "True" && new_status == "False") {
+        // Compressor just turned OFF
+        time_t now = time(nullptr);
+        compressor_on_total_seconds += (now - compressor_on_start_time);
+        cfg.set("unit.compressor_run_hours", std::to_string(compressor_on_total_seconds / 3600));
+        cfg.save();
+        compressor_on_start_time = 0;
+    }
+    last_compressor_status = new_status;
 }
 
 void display_system_thread() {

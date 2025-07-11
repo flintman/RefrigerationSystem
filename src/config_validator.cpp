@@ -6,6 +6,7 @@ ConfigValidator::ConfigValidator() {
         {"logging.interval_sec",     {"300", ConfigType::Integer}},
         {"logging.retention_period", {"30", ConfigType::Integer}},
         {"unit.number",               {"1234", ConfigType::Integer}},
+        {"unit.compressor_run_hours", {"0", ConfigType::Integer}},
         {"defrost.interval_hours",   {"8", ConfigType::Integer}},
         {"defrost.timeout_mins",     {"45", ConfigType::Integer}},
         {"defrost.coil_temperature", {"45", ConfigType::Integer}},

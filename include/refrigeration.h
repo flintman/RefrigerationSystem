@@ -27,6 +27,23 @@ inline const std::string config_file_name = "/etc/refrigeration/config.env";
 inline std::atomic<bool> running{true};
 inline std::mutex status_mutex;
 
+
+// Managers and hardware
+inline ConfigManager cfg(config_file_name);
+inline std::string ip_address = cfg.get("client.ip_address");
+inline GpioManager gpio;
+inline ADS1115 adc;
+inline WS2811Controller ws2811(2, 18);
+inline auto mux = std::make_shared<TCA9548A_SMBus>();
+inline LCD2004_SMBus display1(mux, 1);
+inline LCD2004_SMBus display2(mux, 2);
+inline SensorManager sensors;
+inline Logger logger(stoi(cfg.get("debug.code")));
+inline WiFiManager wifi_manager;
+inline Alarm systemAlarm;
+inline DemoRefrigeration demo;
+inline SecureClient secure_client(ip_address);
+
 // Alarm state
 inline std::atomic<bool> isShutdownAlarm(false);
 inline std::atomic<bool> isWarningAlarm(false);
@@ -44,6 +61,9 @@ inline std::atomic<time_t> alarm_reset_button_press_start_time{0};
 inline std::atomic<time_t> state_timer{0};
 inline std::atomic<time_t> pretrip_stage_start = 0;
 inline std::atomic<int> pretrip_stage{0};
+inline std::atomic<time_t> compressor_on_start_time{0};
+inline std::atomic<long> compressor_on_total_seconds{cfg.get("unit.compressor_run_hours") == "0" ? 0 : std::stol(cfg.get("unit.compressor_run_hours")) * 3600};
+inline std::string last_compressor_status = "False";
 
 // Status map
 inline std::map<std::string, std::string> status = {
@@ -53,23 +73,6 @@ inline std::map<std::string, std::string> status = {
     {"valve", "False"},
     {"electric_heater", "False"}
 };
-
-// Managers and hardware
-
-inline ConfigManager cfg(config_file_name);
-inline std::string ip_address = cfg.get("client.ip_address");
-inline GpioManager gpio;
-inline ADS1115 adc;
-inline WS2811Controller ws2811(2, 18);
-inline auto mux = std::make_shared<TCA9548A_SMBus>();
-inline LCD2004_SMBus display1(mux, 1);
-inline LCD2004_SMBus display2(mux, 2);
-inline SensorManager sensors;
-inline Logger logger(stoi(cfg.get("debug.code")));
-inline WiFiManager wifi_manager;
-inline Alarm systemAlarm;
-inline DemoRefrigeration demo;
-inline SecureClient secure_client(ip_address);
 
 // Sensor data
 inline std::atomic<float>  return_temp = -327.0f;
@@ -99,5 +102,6 @@ void ws8211_system_thread();
 void pretrip_mode();
 void signalHandler(int signal);
 void interruptible_sleep(int total_seconds);
+void update_compressor_on_time(const std::string& new_status);
 
 #endif // REFRIGERATION_H
