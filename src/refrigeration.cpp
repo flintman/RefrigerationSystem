@@ -106,7 +106,7 @@ void null_mode() {
         std::lock_guard<std::mutex> lock(status_mutex);
         status["status"] = "Null";
         status["compressor"] = "False";
-        status["fan"] = "True";
+        status["fan"] = "False";
         status["valve"] = "False";
         status["electric_heater"] = "False";
         logger.log_events("Debug", "System Status: " + status["status"]);
@@ -174,7 +174,7 @@ void alarm_mode() {
 
 void update_gpio_from_status() {
     std::lock_guard<std::mutex> lock(status_mutex);
-    if(cfg.get("unit.fan_continuous") == "1" && status["status"] != "Alarm") {
+    if(cfg.get("unit.fan_continuous") == "1" && status["status"] != "Alarm" && status["status"] != "Defrost") {
         status["fan"] = "True"; // Force fan to be ON in continuous mode
     }
     gpio.write("fan_pin", status["fan"] == "False");
@@ -262,7 +262,7 @@ void update_compressor_on_time(const std::string& new_status) {
         // Compressor just turned OFF
         time_t now = time(nullptr);
         compressor_on_total_seconds += (now - compressor_on_start_time);
-        cfg.set("unit.compressor_run_hours", std::to_string(compressor_on_total_seconds / 3600));
+        cfg.set("unit.compressor_run_hours", std::to_string(compressor_on_total_seconds));
         cfg.save();
         compressor_on_start_time = 0;
     }
