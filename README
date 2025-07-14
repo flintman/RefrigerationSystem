@@ -14,8 +14,11 @@ make
 3. sudo tech-tool to setup the device.
 
 #######  On Start Up #######
-On Startup the system will broadcast a hotspot to be able to connect to it.  This will last for 5 minutes unless you connect to the hotspot and then the hotspot will last
+On Startup the system will broadcast a hotspot to be able to connect to it.  This will last for 2 minutes unless you connect to the hotspot and then the hotspot will last
 as long as you are connected.
+
+#######  Force Start Hotspot #######
+Set the setpoint to 65F and press and hold the alarm button for 10+ seconds.  The ip address will display on the inside screen to connect. save as above its active for 2 minutes unless you stay connected.
 
 #######  Alarm codes #######
     Shutdown Alarms

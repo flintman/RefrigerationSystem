@@ -493,16 +493,31 @@ void checkAlarmPin(){
         if (alarm_reset_button_press_start_time == 0) {
             logger.log_events("Debug", "Alarm Button Pushed");
             alarm_reset_button_press_start_time = std::chrono::duration<double>(std::chrono::system_clock::now().time_since_epoch()).count();
-        } else {
-            double now = std::chrono::duration<double>(std::chrono::system_clock::now().time_since_epoch()).count();
-            double press_duration = now - alarm_reset_button_press_start_time;
-            if (press_duration >= 5) {
-                logger.log_events("Debug", "Alarm Reset ");
-                systemAlarm.resetAlarm();
-            }
         }
     } else {
-        alarm_reset_button_press_start_time = 0;
+        if (alarm_reset_button_press_start_time != 0) {
+            double now = std::chrono::duration<double>(std::chrono::system_clock::now().time_since_epoch()).count();
+            double press_duration = now - alarm_reset_button_press_start_time;
+            int setpoint_int = static_cast<int>(setpoint.load());
+            alarm_reset_button_press_start_time = 0;
+            if (press_duration >= 10 && setpoint_int == 65) {
+                if (!wifi_manager.is_hotspot_active()) {
+                    std::thread hotspot_system(hotspot_start);
+                    hotspot_system.detach(); // Run in background
+                } else {
+                    logger.log_events("Debug", "Hotspot already active, not starting again.");
+                }
+                logger.log_events("Debug", "HotSpot started ");
+            }
+            if (press_duration >= 5 && setpoint_int != 65) {
+                if (systemAlarm.alarmAnyStatus()) {
+                    logger.log_events("Debug", "Alarm Reset ");
+                    systemAlarm.resetAlarm();
+                } else {
+                    logger.log_events("Debug", "Alarm Reset Button pressed but no active alarms to reset.");
+                }
+            }
+        }
     }
 }
 

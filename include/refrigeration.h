@@ -100,6 +100,7 @@ void defrost_mode();
 void display_all_variables();
 void ws8211_system_thread();
 void pretrip_mode();
+void hotspot_start();
 void signalHandler(int signal);
 void interruptible_sleep(int total_seconds);
 void update_compressor_on_time(const std::string& new_status);
