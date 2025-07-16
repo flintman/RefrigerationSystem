@@ -6,6 +6,7 @@
 #include <csignal>
 #include <sstream>
 #include <algorithm>
+#include <future>
 
 time_t last_log_timestamp = time(nullptr) - 400;
 
@@ -622,18 +623,34 @@ void checkAlarms_system(){
     }
 }
 
-void secureclient_loop(){
+void secureclient_loop() {
     int secureclient_timer = std::stoi(cfg.get("client.sent_sec"));
     bool resend = false;
     std::this_thread::sleep_for(std::chrono::seconds(10)); // Wait for system to load
+
     while (running) {
         if (cfg.get("debug.enable_send_data") == "1") {
-            resend = secure_client_send();
-            if (resend) {
+            bool stuck = false;
+            std::future<bool> future_send = std::async(std::launch::async, secure_client_send);
+            // Wait for up to 15 seconds for secure_client_send to finish
+            if (future_send.wait_for(std::chrono::seconds(15)) == std::future_status::ready) {
+                resend = future_send.get();
+            } else {
+                logger.log_events("Error", "secure_client_send appears stuck, skipping get() and will retry later.");
+                stuck = true;
+            }
+
+            if (!stuck && resend) {
                 logger.log_events("Debug", "Resending data due to command received.");
                 interruptible_sleep(10); // Wait before next send
-                resend = secure_client_send();
-            } else {
+                // Try again, with timeout
+                std::future<bool> future_resend = std::async(std::launch::async, secure_client_send);
+                if (future_resend.wait_for(std::chrono::seconds(15)) == std::future_status::ready) {
+                    future_resend.get();
+                } else {
+                    logger.log_events("Error", "secure_client_send (resend) stuck, skipping.");
+                }
+            } else if (!stuck) {
                 logger.log_events("Debug", "Data sent successfully, no command received.");
             }
         } else {
