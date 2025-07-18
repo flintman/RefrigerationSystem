@@ -166,37 +166,24 @@ void LCD2004_SMBus::display(const std::string &text, uint8_t line)
     if (line >= 4)
         return;
 
-    // Check if update is needed
     bool needsUpdate = false;
+    std::array<char, 20> newLine;
     size_t i = 0;
     for (; i < text.size() && i < 20; i++)
-    {
-        if (currentLines[line][i] != text[i])
-        {
-            needsUpdate = true;
-            currentLines[line][i] = text[i];
-        }
-    }
-
-    // Check if clearing is needed
+        newLine[i] = text[i];
     for (; i < 20; i++)
-    {
-        if (currentLines[line][i] != ' ')
-        {
-            needsUpdate = true;
-            currentLines[line][i] = ' ';
-        }
-    }
-
-    if (!needsUpdate)
-        return;
+        newLine[i] = ' ';
 
     mux->selectChannel(channel);
-    setCursor(0, line);
 
-    for (size_t i = 0; i < 20; i++)
+    for (size_t col = 0; col < 20; col++)
     {
-        send(currentLines[line][i], LCD_DATA);
+        if (currentLines[line][col] != newLine[col])
+        {
+            setCursor(col, line);
+            send(newLine[col], LCD_DATA);
+            currentLines[line][col] = newLine[col];
+        }
     }
 }
 
