@@ -12,6 +12,8 @@ ConfigValidator::ConfigValidator() {
         {"defrost.timeout_mins",     {"45", ConfigType::Integer}},
         {"defrost.coil_temperature", {"45", ConfigType::Integer}},
         {"setpoint.offset",          {"2", ConfigType::Integer}},
+        {"setpoint.high_limit",   {"80", ConfigType::Integer}},
+        {"setpoint.low_limit",   {"-20", ConfigType::Integer}},
         {"compressor.off_timer",     {"5", ConfigType::Integer}},
         {"debug.code",               {"1", ConfigType::Boolean}},
         {"wifi.enable_hotspot",      {"1", ConfigType::Boolean}},

@@ -350,8 +350,18 @@ void display_system_thread() {
 void setpoint_system_thread() {
     constexpr float min_voltage = 0.00f;
     constexpr float max_voltage = 3.28f;
-    constexpr float min_setpoint = -20.0f;
-    constexpr float max_setpoint = 80.0f;
+    float min_setpoint = -20.0f;
+    float max_setpoint = 80.0f;
+    try {
+        min_setpoint = std::stof(cfg.get("setpoint.min"));
+    } catch (...) {
+        min_setpoint = -20.0f;
+    }
+    try {
+        max_setpoint = std::stof(cfg.get("setpoint.max"));
+    } catch (...) {
+        max_setpoint = 80.0f;
+    }
     float voltage = 0.0f;
 
     while (running) {
