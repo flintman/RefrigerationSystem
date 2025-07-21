@@ -1,3 +1,7 @@
+1.0.5
+    hotspot:  add ability to turn on/off the hotspot
+    display:  cleaned up code
+    anti-cycle:  Now display AC when anti-cycle is on
 1.0.4
     Tech-tool: save as you go quicker update
     Timer:  track compressor run hours

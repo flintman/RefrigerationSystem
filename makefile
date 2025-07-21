@@ -34,7 +34,7 @@ BIN_DIR = $(BUILD_DIR)/bin
 DEB_DIR = $(BUILD_DIR)/deb
 DEB_NAME = refrigeration
  # Make sure to update the version # in refrigeration.h
-DEB_VERSION = 1.0.4
+DEB_VERSION = 1.0.5
 DEB_ARCH = armhf
 
 # Executable name
