@@ -298,7 +298,11 @@ void display_system_thread() {
         }
 
         try {
-            display1.display("Status: " + status_, 0);
+            if (anti_timer) {
+                display1.display("Status: " + status_ + " AC", 0);
+            } else {
+                display1.display("Status: " + status_, 0);
+            }
             std::stringstream ss;
             ss << "SP: " << setpoint_ << " RT: " << return_temp_;
             display1.display(ss.str(), 1);
