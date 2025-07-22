@@ -3,9 +3,13 @@
 The is my software to control a refrigeration system with a raspberry pi.
 
 ####### To Compile #######
-sudo apt-get install libssl-dev python3-flask build-essential gcc make python3-pandas python3-matplotlib python3-dotenv
+sudo apt-get install libssl-dev build-essential gcc make
 
-make
+make -- to build .deb
+make clean -- to clean build folder
+
+####### Python Server Needs #######
+sudo apt-get install python3-flask python3-pandas python3-matplotlib python3-dotenv
 
 ####### To Install #######
 1. sudo raspi-config
