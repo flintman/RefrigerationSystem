@@ -263,7 +263,7 @@ void update_compressor_on_time(const std::string& new_status) {
         // Compressor just turned OFF
         time_t now = time(nullptr);
         compressor_on_total_seconds += (now - compressor_on_start_time);
-        cfg.set("unit.compressor_run_hours", std::to_string(compressor_on_total_seconds));
+        cfg.set("unit.compressor_run_seconds", std::to_string(compressor_on_total_seconds));
         cfg.save();
         compressor_on_start_time = 0;
     }

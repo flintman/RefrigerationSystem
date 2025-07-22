@@ -62,7 +62,7 @@ inline std::atomic<time_t> state_timer{0};
 inline std::atomic<time_t> pretrip_stage_start = 0;
 inline std::atomic<int> pretrip_stage{0};
 inline std::atomic<time_t> compressor_on_start_time{0};
-inline std::atomic<long> compressor_on_total_seconds{cfg.get("unit.compressor_run_hours") == "0" ? 0 : std::stol(cfg.get("unit.compressor_run_hours"))};
+inline std::atomic<long> compressor_on_total_seconds{cfg.get("unit.compressor_run_seconds") == "0" ? 0 : std::stol(cfg.get("unit.compressor_run_seconds"))};
 inline std::string last_compressor_status = "False";
 
 // Status map
