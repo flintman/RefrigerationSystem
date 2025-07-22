@@ -56,7 +56,7 @@ void TCA9548A_SMBus::selectChannel(uint8_t channel)
     if (channel > 7)
         throw std::out_of_range("Channel must be 0-7");
     smbusWriteByte(0, 1 << channel);
-    usleep(200);
+    usleep(1);
 }
 
 void TCA9548A_SMBus::disableAllChannels()
@@ -122,11 +122,11 @@ void LCD2004_SMBus::write4bits(uint8_t value)
     uint8_t data[1];
     data[0] = value | LCD_ENABLE | (backlightState ? LCD_BACKLIGHT : 0);
     smbusWriteBlock(0, data, 1);
-    usleep(10);
+    usleep(.5);
 
     data[0] = (value & ~LCD_ENABLE) | (backlightState ? LCD_BACKLIGHT : 0);
     smbusWriteBlock(0, data, 1);
-    usleep(10);
+    usleep(.5);
 }
 
 void LCD2004_SMBus::send(uint8_t value, uint8_t mode)
@@ -135,16 +135,16 @@ void LCD2004_SMBus::send(uint8_t value, uint8_t mode)
     uint8_t lownib = (value << 4) & 0xF0;
 
     write4bits(highnib | mode);
-    usleep(5);
+    usleep(.5);
     write4bits(lownib | mode);
-    usleep(5);
+    usleep(.5);
 }
 
 void LCD2004_SMBus::clear()
 {
     mux->selectChannel(channel);
     send(0x01, LCD_CMD);
-    usleep(200);
+    usleep(.5);
 
     // Reset line buffers
     for (auto &line : currentLines)
