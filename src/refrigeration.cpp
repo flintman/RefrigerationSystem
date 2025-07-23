@@ -331,7 +331,25 @@ void display_system_thread() {
             display2.display("Status: " + status_, 0);
             display2.display(ss.str(), 1);
             display2.display("IP:" + wifi_manager.get_ip_address("wlan0"), 2);
-            display2.display("HP:" + wifi_manager.get_ip_address("wlan0_ap"), 3);
+            std::string ap_ip = wifi_manager.get_ip_address("wlan0_ap");
+            if (ap_ip == "xxx.xxx.xxx.xxx") {
+                // Display compressor run seconds as HH:MM
+                int run_seconds = 0;
+                try {
+                    run_seconds = std::stoi(cfg.get("unit.compressor_run_seconds"));
+                } catch (...) {
+                    run_seconds = 0;
+                }
+                int ch = run_seconds / 3600;
+                int cm = (run_seconds % 3600) / 60;
+                std::stringstream css;
+                css << "Run Hours: ";
+                css << (ch < 10 ? "0" : "") << ch << ":"
+                    << (cm < 10 ? "0" : "") << cm;
+                display2.display(css.str(), 3);
+            } else {
+                display2.display("HP:" + ap_ip, 3);
+            }
 
         } catch (const std::exception& e) {
             logger.log_events("Error", std::string("During display updating: ") + e.what());
