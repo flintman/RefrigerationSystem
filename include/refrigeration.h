@@ -53,6 +53,7 @@ inline std::atomic<bool> demo_mode(false);
 inline std::atomic<bool> trigger_defrost{false};
 inline std::atomic<bool> pretrip_enable(false);
 inline std::atomic<bool> anti_timer{false};
+inline std::atomic<bool> setpointMode {false};
 inline std::atomic<time_t> defrost_start_time = 0;
 inline std::atomic<time_t> defrost_button_press_start_time{0};
 inline std::atomic<time_t> defrost_last_time{time(nullptr)};
@@ -64,6 +65,7 @@ inline std::atomic<int> pretrip_stage{0};
 inline std::atomic<time_t> compressor_on_start_time{0};
 inline std::atomic<long> compressor_on_total_seconds{cfg.get("unit.compressor_run_seconds") == "0" ? 0 : std::stol(cfg.get("unit.compressor_run_seconds"))};
 inline std::string last_compressor_status = "False";
+
 
 // Status map
 inline std::map<std::string, std::string> status = {
@@ -78,7 +80,7 @@ inline std::map<std::string, std::string> status = {
 inline std::atomic<float>  return_temp = -327.0f;
 inline std::atomic<float>  supply_temp = -327.0f;
 inline std::atomic<float> coil_temp = -327.0f;
-inline std::atomic<float> setpoint{55.0f};
+inline std::atomic<float> setpoint{std::stof(cfg.get("unit.setpoint"))};
 
 // Logging config
 inline int log_retention_period = stoi(cfg.get("logging.retention_period"));

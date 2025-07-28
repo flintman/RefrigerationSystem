@@ -42,6 +42,8 @@ Set the setpoint to 65F and press and hold the alarm button for 10+ seconds.  Th
 
         9000 - Pretrip Passed
 
+####### Setpoint #######
+There is two options for the setpoint,  either a 10ohm resister rotary switch tied into channel 3 and unit.setpoint_rotary set to 1.  Or you can have buttons if unit.setpoint_rotary = 0 and buttons wired to 3.3 -> channel 1 and 2.  Press and hold either button for 2 seconds and the display will flash with setpoint = XX.  press up and down to get to the setpoint.  Holding a button for more than 5 seconds it will skip by 5.  Press both buttons to save and exit setpoint mode.  If you are in setpoint mode and don't do anything than if exits and keeps the original setpoint on exit if not saved.
 
 ####### Demo Mode #######
 Set the setpoint to 80F and press and hold the defrost button for 10 sec.  This will toggle it in and out of Demo Mode.  This will simulate cooling, heating, defrost, etc to test the equipment and see how it works.

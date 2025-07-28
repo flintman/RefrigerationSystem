@@ -59,8 +59,10 @@ void update_sensor_thread() {
         float local_return_temp, local_supply_temp, local_coil_temp, local_setpoint;
         std::map<std::string, std::string> local_status;
         if (demo_mode) {
-            demo.setStatus(status["status"]);
-            demo.setSetpoint(setpoint.load());
+            demo.setStatus(status["status"]);        // Only update local_setpoint if not in setpoint mode
+            if (!setpointMode) {
+                demo.setSetpoint(setpoint.load());
+            }
             demo.update();
             return_temp = std::round(demo.readReturnTemp() * 10.0f) / 10.0f;
             supply_temp = std::round(demo.readSupplyTemp() * 10.0f) / 10.0f;
@@ -73,7 +75,10 @@ void update_sensor_thread() {
         local_return_temp = return_temp;
         local_supply_temp = supply_temp;
         local_coil_temp   = coil_temp;
-        local_setpoint    = setpoint.load();
+        // Only update local_setpoint if not in setpoint mode
+        if (!setpointMode) {
+            local_setpoint = setpoint.load();
+        }
 
         {
             std::lock_guard<std::mutex> lock(status_mutex);
@@ -304,7 +309,17 @@ void display_system_thread() {
                 display1.display("Status: " + status_, 0);
             }
             std::stringstream ss;
-            ss << "SP: " << setpoint_ << " RT: " << return_temp_;
+            if (setpointMode) {
+                static bool flash = false;
+                flash = !flash;
+                if (flash) {
+                    ss << "Setpoint = " << setpoint_;
+                } else {
+                    ss << "Setpoint =       "; // Blank for flashing effect
+                }
+            } else {
+                ss << "SP: " << setpoint_ << " RT: " << return_temp_;
+            }
             display1.display(ss.str(), 1);
 
             ss.str("");
@@ -355,7 +370,7 @@ void display_system_thread() {
             logger.log_events("Error", std::string("During display updating: ") + e.what());
             return;
         }
-        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
     display1.clear();
     display2.clear();
@@ -365,23 +380,8 @@ void display_system_thread() {
     logger.log_events("Debug", "Display system thread stopped");
 }
 
-void setpoint_system_thread() {
-    constexpr float min_voltage = 0.00f;
-    constexpr float max_voltage = 3.28f;
-    float min_setpoint = -20.0f;
-    float max_setpoint = 80.0f;
-    try {
-        min_setpoint = std::stof(cfg.get("setpoint.min"));
-    } catch (...) {
-        min_setpoint = -20.0f;
-    }
-    try {
-        max_setpoint = std::stof(cfg.get("setpoint.max"));
-    } catch (...) {
-        max_setpoint = 80.0f;
-    }
-    float voltage = 0.0f;
-
+void setpoint_system_rotary(float voltage, float max_voltage, float min_voltage, float min_setpoint, float max_setpoint) {
+    logger.log_events("Debug", "Running Rotary!");
     while (running) {
         if(pretrip_enable) {
             if(pretrip_stage == 1) setpoint = 32.0f;
@@ -419,6 +419,98 @@ void setpoint_system_thread() {
             setpoint = std::round(setpoint * 1.0f) / 1.0f;
             std::this_thread::sleep_for(std::chrono::milliseconds(200));
         }
+    }
+}
+
+void setpoint_system_buttons(float min_setpoint, float max_setpoint) {
+
+    // Setpoint button mode logic
+    static float setpointStart = setpoint.load();
+    static time_t setpointModeStart = 0;
+    static time_t setpointPressedDuration = 0;
+    logger.log_events("Debug", "Running Buttons!");
+    while (running) {
+        float ch1 = adc.readVoltage(1);
+        float ch2 = adc.readVoltage(2);
+
+        // Assume pressed if voltage > 2.5V (adjust threshold as needed)
+        bool ch1_pressed = ch1 > 2.5f;
+        bool ch2_pressed = ch2 > 2.5f;
+
+        static time_t button_press_start = 0;
+        if (!setpointMode && (ch1_pressed || ch2_pressed)) {
+            if (button_press_start == 0) {
+                button_press_start = time(nullptr);
+            }
+            if (time(nullptr) - button_press_start >= 2) {
+                setpointMode = true;
+                setpointStart = setpoint.load();
+                setpointModeStart = time(nullptr);
+                setpointPressedDuration = time(nullptr);
+                logger.log_events("Debug", "Setpoint button mode entered");
+                button_press_start = 0;
+            }
+        } else {
+            button_press_start = 0;
+        }
+
+        if (setpointMode) {
+            float current_setpoint = setpoint.load();
+            float step = 1.0f;
+            // If held for more than 4 seconds, jump by 5°F
+            if ((setpointPressedDuration != 0) && (time(nullptr) - setpointPressedDuration) >= 4) {
+                step = 5.0f;
+            }
+
+            if (ch1_pressed && !ch2_pressed) {
+                // Up
+                setpoint = std::min(current_setpoint + step, max_setpoint);
+                setpointModeStart = time(nullptr); // Reset timer on press
+            } else if (ch2_pressed && !ch1_pressed) {
+                // Down
+                setpoint = std::max(current_setpoint - step, min_setpoint);
+                setpointModeStart = time(nullptr); // Reset timer on press
+            } else if (ch1_pressed && ch2_pressed) {
+                // Save and exit setpoint mode
+                cfg.set("unit.setpoint", std::to_string(static_cast<int>(setpoint.load())));
+                cfg.save();
+                setpointMode = false;
+                logger.log_events("Debug", "Setpoint saved and button mode exited");
+            } else {
+                setpointPressedDuration = time(nullptr);
+                // If no button pressed for 10 seconds, exit without saving
+                if (setpointModeStart != 0 && (time(nullptr) - setpointModeStart) >= 10) {
+                    setpointMode = false;
+                    setpoint = setpointStart;
+                    logger.log_events("Debug", "Setpoint mode exited due to inactivity (no save)");
+                }
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(200));
+        }
+    }
+}
+
+void setpoint_system_thread() {
+    constexpr float min_voltage = 0.00f;
+    constexpr float max_voltage = 3.28f;
+    float min_setpoint = -20.0f;
+    float max_setpoint = 80.0f;
+
+    try {
+        min_setpoint = std::stof(cfg.get("setpoint.min"));
+    } catch (...) {
+        min_setpoint = -20.0f;
+    }
+    try {
+        max_setpoint = std::stof(cfg.get("setpoint.max"));
+    } catch (...) {
+        max_setpoint = 80.0f;
+    }
+    float voltage = 0.0f;
+    if (cfg.get("unit.setpoint_rotary") == "1"){
+        setpoint_system_rotary(voltage, max_voltage, min_voltage, min_setpoint, max_setpoint);
+    } else {
+        setpoint_system_buttons(min_setpoint, max_setpoint);
     }
 }
 
