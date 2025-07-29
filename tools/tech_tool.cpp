@@ -21,6 +21,7 @@ public:
         while (true) {
             clearScreen();
             printCurrentConfig();
+            printTemperatureSensors();
             printMainMenu();
 
             int choice = getMenuChoice(2); // 1: Edit config, 2: Service menu, 0: Exit
@@ -56,7 +57,9 @@ private:
                       << " (default: " << entry.defaultValue << ")\n";
         }
         std::cout << "\n\n";
+    }
 
+    void printTemperatureSensors() {
         std::cout << "=== Temp Sensors ===\n";
         sensors.readOneWireTempSensors();
         std::cout << "\n\n";
@@ -84,6 +87,7 @@ private:
         while (true) {
             clearScreen();
             printCurrentConfig();
+            printTemperatureSensors();
             printConfigMenu();
             std::string choiceStr;
             std::cin >> choiceStr;
