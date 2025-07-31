@@ -1,3 +1,9 @@
+1.1.0
+    setpoint:  Setup min/max setpoint in config file
+    setpoint:  setup to use buttons or 10K rotary encoder
+    lcd:  Drop sleep times to speed up the display
+    hourmeter:  add to display when not in hotspot
+    tech-tool: move sensor collection to its own function
 1.0.5
     hotspot:  add ability to turn on/off the hotspot
     display:  cleaned up code
