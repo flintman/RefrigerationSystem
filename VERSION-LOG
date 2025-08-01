@@ -1,3 +1,5 @@
+1.1.1
+    variables:  remove all seconds from the config file with minutes for simplicity
 1.1.0
     setpoint:  Setup min/max setpoint in config file
     setpoint:  setup to use buttons or 10K rotary encoder

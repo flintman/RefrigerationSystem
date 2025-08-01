@@ -20,7 +20,7 @@
 #include "secure_client.h"
 
 // Version and config
-inline const std::string version = "1.1.0"; //Make sure you update the version in Makefile.
+inline const std::string version = "1.1.1"; //Make sure you update the version in Makefile.
 inline const std::string config_file_name = "/etc/refrigeration/config.env";
 
 // Global state and synchronization
@@ -84,7 +84,7 @@ inline std::atomic<float> setpoint{std::stof(cfg.get("unit.setpoint"))};
 
 // Logging config
 inline int log_retention_period = stoi(cfg.get("logging.retention_period"));
-inline int log_interval = stoi(cfg.get("logging.interval_sec"));
+inline int log_interval = stoi(cfg.get("logging.interval_mins")) * 60; // Convert minutes to seconds
 extern time_t last_log_timestamp;
 
 // Function declarations

@@ -12,7 +12,7 @@ time_t last_log_timestamp = time(nullptr) - 400;
 
 void display_all_variables() {
     logger.log_events("Debug", "YOU NEED TO RUN 'sudo tech-tool' to initialize the sensors");
-    std::cout << "Logging Interval: " << cfg.get("logging.interval_sec") << " seconds\n";
+    std::cout << "Logging Interval: " << cfg.get("logging.interval_mins") << " Minutes\n";
     std::cout << "Log Retention Period: " << cfg.get("logging.retention_period") << " days\n";
     std::cout << "UNIT Number: " << cfg.get("unit.number") << "\n";
     std::cout << "Defrost Interval: " << cfg.get("defrost.interval_hours") << " hours\n";
@@ -25,7 +25,7 @@ void display_all_variables() {
     std::cout << "return: " << cfg.get("sensor.return") << "\n";
     std::cout << "wifi.enable_hotspot: " << cfg.get("wifi.enable_hotspot") << "\n";
     std::cout << "wifi.hotspot_password: " << cfg.get("wifi.hotspot_password") << "\n";
-    std::cout << "client.sent_sec: " << cfg.get("client.sent_sec") << "\n";
+    std::cout << "client.sent_mins: " << cfg.get("client.sent_mins") << "\n";
     std::cout << "client.ip_address: " << cfg.get("client.ip_address") << "\n";
     std::cout << "coil: " << cfg.get("sensor.coil") << "\n";
     std::cout << "supply: " << cfg.get("sensor.supply") << "\n";
@@ -748,7 +748,7 @@ void checkAlarms_system(){
 }
 
 void secureclient_loop() {
-    int secureclient_timer = std::stoi(cfg.get("client.sent_sec"));
+    int secureclient_timer = std::stoi(cfg.get("client.sent_mins")) * 60; // Convert minutes to seconds
     bool resend = false;
     std::this_thread::sleep_for(std::chrono::seconds(10)); // Wait for system to load
 
@@ -796,7 +796,7 @@ bool secure_client_send() { // returns if we need to resend
     bool resend = false;
     float setpoint_;
 
-    int secureclient_timer = std::stoi(cfg.get("client.sent_sec"));
+    int secureclient_timer = std::stoi(cfg.get("client.sent_mins")) * 60; // Convert minutes to seconds
     std::map<std::string, std::string> command;
 
     // Protect all shared/global variables with mutexes

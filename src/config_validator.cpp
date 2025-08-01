@@ -3,7 +3,7 @@
 
 ConfigValidator::ConfigValidator() {
     schema_ = {
-        {"logging.interval_sec",     {"300", ConfigType::Integer}},
+        {"logging.interval_mins",     {"5", ConfigType::Integer}},
         {"logging.retention_period", {"30", ConfigType::Integer}},
         {"unit.number",               {"1234", ConfigType::Integer}},
         {"unit.compressor_run_seconds", {"0", ConfigType::Integer}},
@@ -25,7 +25,7 @@ ConfigValidator::ConfigValidator() {
         {"sensor.supply",   {"0", ConfigType::Integer}},
         {"sensor.coil",   {"0", ConfigType::Integer}},
         {"client.ip_address",   {"192.168.1.1", ConfigType::String}},
-        {"client.sent_sec",   {"900", ConfigType::Integer}}
+        {"client.sent_mins",   {"15", ConfigType::Integer}}
     };
 }
 
