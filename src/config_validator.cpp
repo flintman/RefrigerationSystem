@@ -20,12 +20,12 @@ ConfigValidator::ConfigValidator() {
         {"compressor.off_timer",     {"5", ConfigType::Integer}},
         {"wifi.enable_hotspot",      {"1", ConfigType::Boolean}},
         {"wifi.hotspot_password",    {"changeme", ConfigType::String}},
-        {"debug.enable_send_data",   {"0", ConfigType::Boolean}},
         {"sensor.return",   {"0", ConfigType::Integer}},
         {"sensor.supply",   {"0", ConfigType::Integer}},
         {"sensor.coil",   {"0", ConfigType::Integer}},
         {"client.ip_address",   {"192.168.1.1", ConfigType::String}},
         {"client.cert",   {"/etc/refrigeration/cert.pem", ConfigType::String}},
+        {"client.enable_send_data",   {"0", ConfigType::Boolean}},
         {"client.key",    {"/etc/refrigeration/key.pem", ConfigType::String}},
         {"client.ca",     {"/etc/refrigeration/ca.pem", ConfigType::String}},
         {"client.sent_mins",   {"15", ConfigType::Integer}}

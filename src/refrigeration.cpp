@@ -21,7 +21,7 @@ void display_all_variables() {
     std::cout << "Temperature Setpoint Offset: " << cfg.get("setpoint.offset") << "°F\n";
     std::cout << "Compressor Off Timer: " << cfg.get("compressor.off_timer") << " minutes\n";
     std::cout << "Debug Code: " << cfg.get("debug.code") << "\n";
-    std::cout << "Debug Data Sending: " << (cfg.get("debug.enable_send_data") == "1" ? "Enabled" : "Disabled") << "\n";
+    std::cout << "Debug Data Sending: " << (cfg.get("client.enable_send_data") == "1" ? "Enabled" : "Disabled") << "\n";
     std::cout << "return: " << cfg.get("sensor.return") << "\n";
     std::cout << "wifi.enable_hotspot: " << cfg.get("wifi.enable_hotspot") << "\n";
     std::cout << "wifi.hotspot_password: " << cfg.get("wifi.hotspot_password") << "\n";
@@ -753,7 +753,7 @@ void secureclient_loop() {
     std::this_thread::sleep_for(std::chrono::seconds(10)); // Wait for system to load
 
     while (running) {
-        if (cfg.get("debug.enable_send_data") == "1") {
+        if (cfg.get("client.enable_send_data") == "1") {
             bool stuck = false;
             std::future<bool> future_send = std::async(std::launch::async, secure_client_send);
             // Wait for up to 15 seconds for secure_client_send to finish
