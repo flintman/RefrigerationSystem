@@ -42,7 +42,8 @@ inline Logger logger(stoi(cfg.get("debug.code")));
 inline WiFiManager wifi_manager;
 inline Alarm systemAlarm;
 inline DemoRefrigeration demo;
-inline SecureClient secure_client(ip_address);
+inline std::string cert_file = cfg.get("client.cert");
+inline SecureClient secure_client(ip_address, 5001, cert_file);
 
 // Alarm state
 inline std::atomic<bool> isShutdownAlarm(false);

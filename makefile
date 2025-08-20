@@ -117,9 +117,6 @@ deb: $(TARGET) $(TOOL_TARGET)
 	echo "systemctl disable $(DEB_NAME).service" >> $(DEB_DIR)/DEBIAN/prerm
 	chmod +x $(DEB_DIR)/DEBIAN/prerm
 
-	# Copy SSL certificate
-	cp python/server/ssl/cert.pem $(DEB_DIR)/etc/refrigeration/cert.pem
-
 	# Copy service file
 	cp services/$(DEB_NAME).service $(DEB_DIR)/etc/systemd/system/$(DEB_NAME).service
 

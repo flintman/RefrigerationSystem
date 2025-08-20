@@ -24,8 +24,6 @@ def log(msg):
 class SecureServer:
     def __init__(self, host="0.0.0.0", port=5001,
                  web_port=5008,
-                 cert_file="/home/flintman/ssl/cert.pem",
-                 key_file="/home/flintman/ssl/key.pem",
                  max_attempts=3):
         self.host = host
         self.port = port
@@ -34,8 +32,8 @@ class SecureServer:
         self.email_server = os.getenv("EMAIL_SERVER", "")
         self.email_address = os.getenv("EMAIL_ADDRESS", "")
         self.email_password = os.getenv("EMAIL_PASSWORD", "")
-        self.cert_file = cert_file
-        self.key_file = key_file
+        self.cert_file = os.getenv("CERT_FILE", "")
+        self.key_file = os.getenv("KEY_FILE", "")
         self.server_socket = None
         self.failed_attempts = {}
         self.max_attempts = max_attempts
