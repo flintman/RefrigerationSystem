@@ -34,6 +34,7 @@ class SecureServer:
         self.email_password = os.getenv("EMAIL_PASSWORD", "")
         self.cert_file = os.getenv("CERT_FILE", "")
         self.key_file = os.getenv("KEY_FILE", "")
+        self.ca_cert_file = os.getenv("CA_CERT_FILE", "")
         self.server_socket = None
         self.failed_attempts = {}
         self.max_attempts = max_attempts
@@ -120,6 +121,8 @@ class SecureServer:
         context.minimum_version = ssl.TLSVersion.TLSv1_2
         context.set_ciphers('ECDHE+AESGCM:DHE+AESGCM:!aNULL:!eNULL:!MD5:!RC4')
         context.load_cert_chain(certfile=self.cert_file, keyfile=self.key_file)
+        context.load_verify_locations(cafile=self.ca_cert_file)
+        context.verify_mode = ssl.CERT_REQUIRED
 
         self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)

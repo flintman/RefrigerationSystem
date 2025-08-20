@@ -43,7 +43,9 @@ inline WiFiManager wifi_manager;
 inline Alarm systemAlarm;
 inline DemoRefrigeration demo;
 inline std::string cert_file = cfg.get("client.cert");
-inline SecureClient secure_client(ip_address, 5001, cert_file);
+inline std::string key_file = cfg.get("client.key");
+inline std::string ca_file = cfg.get("client.ca");
+inline SecureClient secure_client(ip_address, 5001, cert_file, key_file, ca_file);
 
 // Alarm state
 inline std::atomic<bool> isShutdownAlarm(false);

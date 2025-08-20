@@ -12,8 +12,8 @@
 #include <iostream>
 
 SecureClient::SecureClient(const std::string& server_ip,
-                           int port, const std::string& cert_file)
-    : server_ip_(server_ip), port_(port), cert_file_(cert_file),
+                           int port, const std::string& cert_file, const std::string& key_file, const std::string& ca_file)
+    : server_ip_(server_ip), port_(port), cert_file_(cert_file), key_file_(key_file), ca_file_(ca_file),
       reconnect_delay_(5),  socket_fd_(-1),
       ctx_(nullptr), ssl_(nullptr)
 {
@@ -21,7 +21,26 @@ SecureClient::SecureClient(const std::string& server_ip,
     OpenSSL_add_all_algorithms();
     SSL_load_error_strings();
     ctx_ = SSL_CTX_new(TLS_client_method());
-    SSL_CTX_set_verify(ctx_, SSL_VERIFY_NONE, nullptr);  // Ignore cert verification
+
+        // Load CA (trusted certificates)
+    if (!SSL_CTX_load_verify_locations(ctx_, ca_file_.c_str(), nullptr)) {
+        logger.log_events("Error", "Failed to load CA file: " + ca_file_);
+        ERR_print_errors_fp(stderr);
+    }
+
+    // Load client certificate and key
+    if (!SSL_CTX_use_certificate_file(ctx_, cert_file_.c_str(), SSL_FILETYPE_PEM)) {
+        logger.log_events("Error", "Failed to load client certificate");
+        ERR_print_errors_fp(stderr);
+    }
+    if (!SSL_CTX_use_PrivateKey_file(ctx_, key_file_.c_str(), SSL_FILETYPE_PEM)) {
+        logger.log_events("Error", "Failed to load client key");
+        ERR_print_errors_fp(stderr);
+    }
+
+    // Require verification
+    SSL_CTX_set_verify(ctx_, SSL_VERIFY_PEER, nullptr);
+    SSL_CTX_set_verify_depth(ctx_, 4);
 }
 
 void SecureClient::connect() {

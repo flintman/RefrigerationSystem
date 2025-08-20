@@ -26,6 +26,8 @@ ConfigValidator::ConfigValidator() {
         {"sensor.coil",   {"0", ConfigType::Integer}},
         {"client.ip_address",   {"192.168.1.1", ConfigType::String}},
         {"client.cert",   {"/etc/refrigeration/cert.pem", ConfigType::String}},
+        {"client.key",    {"/etc/refrigeration/key.pem", ConfigType::String}},
+        {"client.ca",     {"/etc/refrigeration/ca.pem", ConfigType::String}},
         {"client.sent_mins",   {"15", ConfigType::Integer}}
     };
 }
