@@ -51,6 +51,48 @@ Set the setpoint to 80F and press and hold the defrost button for 10 sec.  This 
 ####### PRETRIP Mode #######
 Set the setpoint to 65F and press and hold the defrost button for 10 sec.  This will start pretrip mode.  This will simulate cooling, heating, and back to cooling before either alarming out or passing.
 
+####### Generate keys #######
+
+- Common key
+    openssl genrsa -out ca.key 4096
+
+    openssl req -x509 -new -key ca.key -sha256 -days 3650 -out ca.pem \
+      -subj "/C=US/O=Refrigeration/OU=Root CA/CN=Refrigeration Root CA" \
+      -addext "basicConstraints=critical,CA:true" \
+      -addext "keyUsage=critical, keyCertSign, cRLSign"
+
+- Server key
+    openssl genrsa -out server.key 2048
+
+    openssl req -new -key server.key -out server.csr \
+       -subj "/C=US/O=Refrigeration/OU=Server/CN=Refrigeration Server"
+
+    openssl x509 -req -in server.csr -CA ca.pem -CAkey ca.key -CAcreateserial \
+      -out server.crt -days 825 -sha256 Certificate request self-signature ok \
+    subject=C = US, O = Refrigeration, OU = Server, CN = Refrigeration Server
+
+- Client Key
+    openssl genrsa -out client.key 2048
+
+    openssl req -new -key client.key -out client.csr \
+      -subj "/C=US/O=Refrigeration/OU=Client/CN=Refrigeration Client"
+
+    openssl x509 -req -in client.csr -CA ca.pem -CAkey ca.key -CAcreateserial \
+      -out client.crt -days 825 -sha256 Certificate request self-signature ok \
+    subject=C = US, O = Refrigeration, OU = Client, CN = Refrigeration Client
+
+This will generate ca.key  ca.pem  ca.srl  client.crt  client.csr  client.key  server.crt  server.csr  server.key
+
+-Server files needed
+    CERT_FILE=/path/to/server.crt
+    KEY_FILE=/path/to/server.key
+    CA_CERT_FILE=/path/to/ca.pem
+
+-Client files needed
+    client.ca=/path/to/ca.pem
+    client.cert=/path/to/client.crt
+    client.key=/path/to/client.key
+
 ####### GPIO Pins used  #########
 Compressor Output : 17
 Fan output : 27
