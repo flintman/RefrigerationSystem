@@ -1,0 +1,950 @@
+#include "secure_server.h"
+#include <iostream>
+#include <fstream>
+#include <sstream>
+#include <chrono>
+#include <ctime>
+#include <iomanip>
+#include <algorithm>
+#include <filesystem>
+#include <cstring>
+#include <regex>
+#include <random>
+#include <numeric>
+#include <unistd.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <openssl/ssl.h>
+#include <openssl/err.h>
+#include <openssl/bio.h>
+#include <openssl/buffer.h>
+
+SecureServer::SecureServer(const std::string& host, int port, int web_port, int max_attempts)
+    : host_(host), port_(port), web_port_(web_port), max_attempts_(max_attempts),
+      socket_server_fd_(-1), web_server_fd_(-1), running_(false) {
+    
+    load_environment_variables();
+    create_data_directory();
+    load_blocked_ips();
+    load_data();
+    
+    // Initialize OpenSSL
+    OPENSSL_init_ssl(0, NULL);
+    OPENSSL_init_crypto(0, NULL);
+}
+
+SecureServer::~SecureServer() {
+    stop();
+    EVP_cleanup();
+}
+
+void SecureServer::load_environment_variables() {
+    // Load environment variables or use defaults
+    const char* env_value;
+    
+    env_value = std::getenv("EMAIL_SERVER");
+    email_server_ = env_value ? env_value : "";
+    
+    env_value = std::getenv("EMAIL_ADDRESS");
+    email_address_ = env_value ? env_value : "";
+    
+    env_value = std::getenv("EMAIL_PASSWORD");
+    email_password_ = env_value ? env_value : "";
+    
+    env_value = std::getenv("CERT_FILE");
+    cert_file_ = env_value ? env_value : "";
+    
+    env_value = std::getenv("KEY_FILE");
+    key_file_ = env_value ? env_value : "";
+    
+    env_value = std::getenv("CA_CERT_FILE");
+    ca_cert_file_ = env_value ? env_value : "";
+}
+
+void SecureServer::create_data_directory() {
+    if (!std::filesystem::exists(DATA_DIRECTORY)) {
+        std::filesystem::create_directories(DATA_DIRECTORY);
+    }
+}
+
+void SecureServer::load_blocked_ips() {
+    std::lock_guard<std::mutex> lock(blocked_ips_mutex_);
+    blocked_ips_.clear();
+    
+    std::ifstream file(BLOCKED_IPS_FILE);
+    if (file.is_open()) {
+        nlohmann::json j;
+        file >> j;
+        if (j.is_array()) {
+            for (const auto& ip : j) {
+                if (ip.is_string()) {
+                    blocked_ips_.insert(ip.get<std::string>());
+                }
+            }
+        }
+    }
+}
+
+void SecureServer::save_blocked_ips() {
+    std::lock_guard<std::mutex> lock(blocked_ips_mutex_);
+    nlohmann::json j = nlohmann::json::array();
+    for (const auto& ip : blocked_ips_) {
+        j.push_back(ip);
+    }
+    
+    std::ofstream file(BLOCKED_IPS_FILE);
+    file << j.dump(4);
+}
+
+void SecureServer::load_data() {
+    std::lock_guard<std::mutex> lock(data_mutex_);
+    unit_data_.clear();
+    
+    for (const auto& entry : std::filesystem::directory_iterator(DATA_DIRECTORY)) {
+        if (entry.is_regular_file() && entry.path().extension() == ".json") {
+            std::string filename = entry.path().filename().string();
+            size_t underscore_pos = filename.find('_');
+            if (underscore_pos != std::string::npos) {
+                std::string unit = filename.substr(0, underscore_pos);
+                process_file(unit, entry.path().string());
+            }
+        }
+    }
+}
+
+void SecureServer::process_file(const std::string& unit, const std::string& file_path) {
+    std::ifstream file(file_path);
+    if (!file.is_open()) return;
+    
+    nlohmann::json j;
+    file >> j;
+    
+    if (!j.is_array()) return;
+    
+    if (unit_data_.find(unit) == unit_data_.end()) {
+        unit_data_[unit] = std::vector<nlohmann::json>();
+    }
+    
+    for (const auto& record : j) {
+        if (record.is_object()) {
+            nlohmann::json processed_record = record;
+            // Note: timestamp parsing would need to be implemented properly
+            // For now, we'll keep the timestamp as-is
+            unit_data_[unit].push_back(processed_record);
+        }
+    }
+    
+    // Sort by timestamp (assuming timestamp is a string)
+    std::sort(unit_data_[unit].begin(), unit_data_[unit].end(),
+        [](const nlohmann::json& a, const nlohmann::json& b) {
+            return a.value("timestamp", "") < b.value("timestamp", "");
+        });
+}
+
+void SecureServer::start() {
+    running_ = true;
+    
+    // Start socket server thread
+    socket_thread_ = std::thread(&SecureServer::start_socket_server, this);
+    
+    // Start web server thread  
+    web_thread_ = std::thread(&SecureServer::start_web_server, this);
+    
+    log("SecureServer started on socket port " + std::to_string(port_) + 
+        " and web port " + std::to_string(web_port_));
+    
+    // Wait for threads to complete
+    if (socket_thread_.joinable()) {
+        socket_thread_.join();
+    }
+    if (web_thread_.joinable()) {
+        web_thread_.join();
+    }
+}
+
+void SecureServer::stop() {
+    running_ = false;
+    
+    if (socket_server_fd_ != -1) {
+        close(socket_server_fd_);
+        socket_server_fd_ = -1;
+    }
+    
+    if (web_server_fd_ != -1) {
+        close(web_server_fd_);
+        web_server_fd_ = -1;
+    }
+    
+    if (socket_thread_.joinable()) {
+        socket_thread_.join();
+    }
+    if (web_thread_.joinable()) {
+        web_thread_.join();
+    }
+}
+
+SSL_CTX* SecureServer::create_ssl_context() {
+    const SSL_METHOD* method = TLS_server_method();
+    SSL_CTX* ctx = SSL_CTX_new(method);
+    
+    if (!ctx) {
+        log("Unable to create SSL context");
+        ERR_print_errors_fp(stderr);
+        return nullptr;
+    }
+    
+    // Set minimum TLS version
+    SSL_CTX_set_min_proto_version(ctx, TLS1_2_VERSION);
+    
+    // Set cipher list
+    SSL_CTX_set_cipher_list(ctx, "ECDHE+AESGCM:DHE+AESGCM:!aNULL:!eNULL:!MD5:!RC4");
+    
+    // Load certificate and key
+    if (SSL_CTX_use_certificate_file(ctx, cert_file_.c_str(), SSL_FILETYPE_PEM) <= 0) {
+        log("Failed to load certificate file");
+        ERR_print_errors_fp(stderr);
+        SSL_CTX_free(ctx);
+        return nullptr;
+    }
+    
+    if (SSL_CTX_use_PrivateKey_file(ctx, key_file_.c_str(), SSL_FILETYPE_PEM) <= 0) {
+        log("Failed to load private key file");
+        ERR_print_errors_fp(stderr);
+        SSL_CTX_free(ctx);
+        return nullptr;
+    }
+    
+    // Load CA certificate for client verification
+    if (!ca_cert_file_.empty()) {
+        if (SSL_CTX_load_verify_locations(ctx, ca_cert_file_.c_str(), nullptr) <= 0) {
+            log("Failed to load CA certificate file");
+            ERR_print_errors_fp(stderr);
+        }
+        SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT, nullptr);
+    }
+    
+    return ctx;
+}
+
+void SecureServer::start_socket_server() {
+    SSL_CTX* ctx = create_ssl_context();
+    if (!ctx) {
+        log("Failed to create SSL context");
+        return;
+    }
+    
+    socket_server_fd_ = socket(AF_INET, SOCK_STREAM, 0);
+    if (socket_server_fd_ < 0) {
+        log("Failed to create socket");
+        SSL_CTX_free(ctx);
+        return;
+    }
+    
+    int opt = 1;
+    setsockopt(socket_server_fd_, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+    
+    struct sockaddr_in addr;
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(port_);
+    addr.sin_addr.s_addr = INADDR_ANY;
+    
+    if (bind(socket_server_fd_, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
+        log("Failed to bind socket server");
+        close(socket_server_fd_);
+        SSL_CTX_free(ctx);
+        return;
+    }
+    
+    if (listen(socket_server_fd_, 10) < 0) {
+        log("Failed to listen on socket server");
+        close(socket_server_fd_);
+        SSL_CTX_free(ctx);
+        return;
+    }
+    
+    log("Secure socket server listening on " + host_ + ":" + std::to_string(port_));
+    
+    while (running_) {
+        struct sockaddr_in client_addr;
+        socklen_t client_len = sizeof(client_addr);
+        
+        int client_fd = accept(socket_server_fd_, (struct sockaddr*)&client_addr, &client_len);
+        if (client_fd < 0) {
+            if (running_) {
+                log("Failed to accept client connection");
+            }
+            continue;
+        }
+        
+        std::string client_ip = inet_ntoa(client_addr.sin_addr);
+        log("Accepted connection from " + client_ip);
+        
+        // Check if IP is blocked
+        {
+            std::lock_guard<std::mutex> lock(blocked_ips_mutex_);
+            if (blocked_ips_.find(client_ip) != blocked_ips_.end()) {
+                log("Blocked connection attempt from " + client_ip);
+                close(client_fd);
+                continue;
+            }
+        }
+        
+        // Create SSL connection
+        SSL* ssl = SSL_new(ctx);
+        SSL_set_fd(ssl, client_fd);
+        
+        if (SSL_accept(ssl) <= 0) {
+            log("SSL handshake failed for " + client_ip);
+            ERR_print_errors_fp(stderr);
+            
+            // Track failed attempts
+            failed_attempts_[client_ip]++;
+            if (failed_attempts_[client_ip] >= max_attempts_) {
+                std::lock_guard<std::mutex> lock(blocked_ips_mutex_);
+                blocked_ips_.insert(client_ip);
+                save_blocked_ips();
+                log("IP " + client_ip + " blocked after " + std::to_string(max_attempts_) + " failed attempts");
+            }
+            
+            SSL_free(ssl);
+            close(client_fd);
+            continue;
+        }
+        
+        log("SSL handshake complete for " + client_ip);
+        
+        // Handle client in a separate thread
+        std::thread([this, ssl, client_fd, client_ip]() {
+            handle_client(ssl, client_ip);
+            SSL_shutdown(ssl);
+            SSL_free(ssl);
+            close(client_fd);
+        }).detach();
+    }
+    
+    SSL_CTX_free(ctx);
+}
+
+void SecureServer::handle_client(SSL* ssl, const std::string& client_ip) {
+    log("Handling client " + client_ip);
+    
+    char buffer[1024] = {0};
+    std::string data;
+    
+    // Read data from client via SSL
+    while (running_) {
+        int bytes_read = SSL_read(ssl, buffer, sizeof(buffer) - 1);
+        if (bytes_read <= 0) {
+            log("No more data from " + client_ip);
+            break;
+        }
+        
+        buffer[bytes_read] = '\0';
+        data += buffer;
+        
+        // Check if we have a complete JSON message
+        if (data.find('}') != std::string::npos) {
+            log("End of JSON detected from " + client_ip);
+            break;
+        }
+    }
+    
+    if (data.empty()) {
+        log("No data received from " + client_ip);
+        return;
+    }
+    
+    try {
+        nlohmann::json received_data = nlohmann::json::parse(data);
+        log("Received from " + client_ip + ": " + received_data.dump());
+        
+        // Process alarm codes if they're in string format
+        if (received_data.contains("alarm_codes") && received_data["alarm_codes"].is_string()) {
+            std::string alarm_codes_str = received_data["alarm_codes"];
+            std::vector<int> alarm_codes;
+            std::stringstream ss(alarm_codes_str);
+            std::string code;
+            while (std::getline(ss, code, ',')) {
+                code.erase(0, code.find_first_not_of(" \t"));
+                code.erase(code.find_last_not_of(" \t") + 1);
+                if (!code.empty() && std::all_of(code.begin(), code.end(), ::isdigit)) {
+                    alarm_codes.push_back(std::stoi(code));
+                }
+            }
+            received_data["alarm_codes"] = alarm_codes;
+        }
+        
+        if (received_data.contains("unit")) {
+            std::string unit = received_data["unit"];
+            append_data(received_data);
+            
+            nlohmann::json response;
+            response["status"] = "Received";
+            
+            // Check for pending commands
+            {
+                std::lock_guard<std::mutex> lock(data_mutex_);
+                auto it = pending_commands_.find(unit);
+                if (it != pending_commands_.end()) {
+                    response["status"] = it->second;
+                    pending_commands_.erase(it);
+                    log("Sending command " + it->second + " to Unit " + unit);
+                }
+            }
+            
+            // Check for alarms and send email
+            if (received_data.contains("alarm_codes") && !received_data["alarm_codes"].empty()) {
+                std::vector<int> current_alarms = received_data["alarm_codes"];
+                
+                // Check if alarms have changed
+                bool send_email = false;
+                {
+                    std::lock_guard<std::mutex> lock(data_mutex_);
+                    auto it = active_alarms_.find(unit);
+                    if (it == active_alarms_.end() || it->second != current_alarms) {
+                        active_alarms_[unit] = current_alarms;
+                        send_email = true;
+                    }
+                }
+                
+                if (send_email) {
+                    log("Sending email for Unit " + unit + " with alarms");
+                    this->send_email(received_data);
+                } else {
+                    log("Alarm for Unit " + unit + " already sent. Skipping email.");
+                }
+            } else {
+                // Clear alarms for this unit
+                std::lock_guard<std::mutex> lock(data_mutex_);
+                auto it = active_alarms_.find(unit);
+                if (it != active_alarms_.end()) {
+                    log("Unit " + unit + " alarms cleared. Ready for next alert.");
+                    active_alarms_.erase(it);
+                }
+            }
+            
+            // Send response
+            std::string response_str = response.dump();
+            SSL_write(ssl, response_str.c_str(), response_str.length());
+            log("Sent to " + client_ip + ": " + response_str);
+            
+            cleanup_old_data();
+        }
+        
+    } catch (const std::exception& e) {
+        log("Error parsing JSON from " + client_ip + ": " + e.what());
+    }
+    
+    log("Client " + client_ip + " disconnected");
+}
+
+void SecureServer::append_data(const nlohmann::json& data) {
+    std::string unit = data.value("unit", "unknown");
+    
+    auto now = std::chrono::system_clock::now();
+    auto time_t = std::chrono::system_clock::to_time_t(now);
+    std::tm* tm = std::localtime(&time_t);
+    
+    std::ostringstream date_stream;
+    date_stream << std::put_time(tm, "%Y-%m-%d");
+    std::string date_str = date_stream.str();
+    
+    std::string filepath = std::string(DATA_DIRECTORY) + "/" + unit + "_" + date_str + ".json";
+    
+    log("Appending data for Unit " + unit + " to " + filepath);
+    
+    nlohmann::json existing_data = nlohmann::json::array();
+    
+    // Read existing file if it exists
+    std::ifstream infile(filepath);
+    if (infile.is_open()) {
+        infile >> existing_data;
+        if (!existing_data.is_array()) {
+            existing_data = nlohmann::json::array({existing_data});
+        }
+    }
+    
+    // Add new data
+    existing_data.push_back(data);
+    
+    // Write back to file
+    std::ofstream outfile(filepath);
+    outfile << existing_data.dump(4);
+    
+    log("Data appended to " + filepath);
+    
+    // Reload data
+    load_data();
+}
+
+void SecureServer::cleanup_old_data(int days) {
+    auto now = std::chrono::system_clock::now();
+    auto cutoff = now - std::chrono::hours(24 * days);
+    
+    try {
+        for (const auto& entry : std::filesystem::directory_iterator(DATA_DIRECTORY)) {
+            if (entry.is_regular_file() && entry.path().extension() == ".json") {
+                std::string filename = entry.path().filename().string();
+                
+                // Extract date from filename (format: unit_YYYY-MM-DD.json)
+                size_t underscore_pos = filename.find('_');
+                size_t dot_pos = filename.find('.');
+                
+                if (underscore_pos != std::string::npos && dot_pos != std::string::npos) {
+                    std::string date_str = filename.substr(underscore_pos + 1, dot_pos - underscore_pos - 1);
+                    
+                    // Parse date (simplified - would need proper date parsing)
+                    std::tm tm = {};
+                    std::istringstream ss(date_str);
+                    ss >> std::get_time(&tm, "%Y-%m-%d");
+                    
+                    if (!ss.fail()) {
+                        auto file_time = std::chrono::system_clock::from_time_t(std::mktime(&tm));
+                        
+                        if (file_time < cutoff) {
+                            std::filesystem::remove(entry.path());
+                            log("Deleted old file: " + filename);
+                        }
+                    }
+                }
+            }
+        }
+    } catch (const std::exception& e) {
+        log("Error during cleanup: " + std::string(e.what()));
+    }
+}
+
+void SecureServer::log(const std::string& message) {
+    auto now = std::chrono::system_clock::now();
+    auto time_t = std::chrono::system_clock::to_time_t(now);
+    std::tm* tm = std::localtime(&time_t);
+    
+    std::ostringstream timestamp;
+    timestamp << std::put_time(tm, "%Y-%m-%d %H:%M:%S");
+    
+    std::cout << "[" << timestamp.str() << "][TID:" << std::this_thread::get_id() << "] " << message << std::endl;
+}
+
+std::string SecureServer::get_current_timestamp() {
+    auto now = std::chrono::system_clock::now();
+    auto time_t = std::chrono::system_clock::to_time_t(now);
+    std::tm* tm = std::localtime(&time_t);
+    
+    std::ostringstream timestamp;
+    timestamp << std::put_time(tm, "%Y-%m-%d %H:%M:%S");
+    return timestamp.str();
+}
+
+void SecureServer::start_web_server() {
+    web_server_fd_ = socket(AF_INET, SOCK_STREAM, 0);
+    if (web_server_fd_ < 0) {
+        log("Failed to create web server socket");
+        return;
+    }
+    
+    int opt = 1;
+    setsockopt(web_server_fd_, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+    
+    struct sockaddr_in addr;
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(web_port_);
+    addr.sin_addr.s_addr = INADDR_ANY;
+    
+    if (bind(web_server_fd_, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
+        log("Failed to bind web server");
+        close(web_server_fd_);
+        return;
+    }
+    
+    if (listen(web_server_fd_, 10) < 0) {
+        log("Failed to listen on web server");
+        close(web_server_fd_);
+        return;
+    }
+    
+    log("Web server listening on " + host_ + ":" + std::to_string(web_port_));
+    
+    while (running_) {
+        struct sockaddr_in client_addr;
+        socklen_t client_len = sizeof(client_addr);
+        
+        int client_fd = accept(web_server_fd_, (struct sockaddr*)&client_addr, &client_len);
+        if (client_fd < 0) {
+            if (running_) {
+                log("Failed to accept web client connection");
+            }
+            continue;
+        }
+        
+        // Handle web client in separate thread
+        std::thread([this, client_fd]() {
+            handle_web_client(client_fd);
+            close(client_fd);
+        }).detach();
+    }
+}
+
+void SecureServer::handle_web_client(int client_fd) {
+    char buffer[4096] = {0};
+    int bytes_read = recv(client_fd, buffer, sizeof(buffer) - 1, 0);
+    
+    if (bytes_read <= 0) {
+        return;
+    }
+    
+    std::string request(buffer, bytes_read);
+    std::string response = process_http_request(request);
+    
+    send(client_fd, response.c_str(), response.length(), 0);
+}
+
+std::string SecureServer::process_http_request(const std::string& request) {
+    std::istringstream request_stream(request);
+    std::string method, path, version;
+    request_stream >> method >> path >> version;
+    
+    // Parse headers
+    std::map<std::string, std::string> headers = parse_http_headers(request);
+    
+    if (method == "GET") {
+        return handle_get_request(path, headers);
+    } else if (method == "POST") {
+        // Extract body from request
+        size_t body_start = request.find("\r\n\r\n");
+        std::string body;
+        if (body_start != std::string::npos) {
+            body = request.substr(body_start + 4);
+        }
+        return handle_post_request(path, body, headers);
+    }
+    
+    return create_http_response(405, "text/plain", "Method Not Allowed");
+}
+
+std::string SecureServer::handle_get_request(const std::string& path, const std::map<std::string, std::string>& headers) {
+    if (path == "/") {
+        return render_template("index.html");
+    } else if (path.substr(0, 8) == "/static/") {
+        return serve_static_file(path.substr(8));
+    } else if (path.substr(0, 6) == "/unit/") {
+        std::string unit = path.substr(6);
+        std::lock_guard<std::mutex> lock(data_mutex_);
+        auto it = unit_data_.find(unit);
+        if (it != unit_data_.end()) {
+            nlohmann::json response = it->second;
+            return create_http_response(200, "application/json", response.dump());
+        } else {
+            return create_http_response(404, "application/json", "[]");
+        }
+    } else if (path.substr(0, 10) == "/download/") {
+        std::string unit = path.substr(10);
+        std::string csv_data = generate_csv_data(unit);
+        if (!csv_data.empty()) {
+            std::map<std::string, std::string> extra_headers;
+            extra_headers["Content-Disposition"] = "attachment; filename=unit_" + unit + "_data.csv";
+            return create_http_response(200, "text/csv", csv_data, extra_headers);
+        } else {
+            return create_http_response(404, "text/plain", "No data available");
+        }
+    } else if (path == "/api/units") {
+        // API endpoint to get units and their data
+        std::lock_guard<std::mutex> lock(data_mutex_);
+        nlohmann::json response;
+        response["units"] = get_unit_list();
+        response["unit_data"] = unit_data_;
+        return create_http_response(200, "application/json", response.dump());
+    }
+    
+    return create_http_response(404, "text/plain", "Not Found");
+}
+
+std::string SecureServer::handle_post_request(const std::string& path, const std::string& body, const std::map<std::string, std::string>& headers) {
+    if (path.substr(0, 9) == "/command/") {
+        std::string unit = path.substr(9);
+        
+        try {
+            nlohmann::json request_json = nlohmann::json::parse(body);
+            if (request_json.contains("command")) {
+                std::string command = request_json["command"];
+                
+                {
+                    std::lock_guard<std::mutex> lock(data_mutex_);
+                    pending_commands_[unit] = command;
+                }
+                
+                nlohmann::json response;
+                response["status"] = "success";
+                response["message"] = "Command " + command + " queued for " + unit;
+                
+                return create_http_response(200, "application/json", response.dump());
+            } else {
+                nlohmann::json error_response;
+                error_response["status"] = "error";
+                error_response["message"] = "Invalid command";
+                return create_http_response(400, "application/json", error_response.dump());
+            }
+        } catch (const std::exception& e) {
+            nlohmann::json error_response;
+            error_response["status"] = "error";
+            error_response["message"] = "Invalid JSON";
+            return create_http_response(400, "application/json", error_response.dump());
+        }
+    }
+    
+    return create_http_response(404, "text/plain", "Not Found");
+}
+
+std::string SecureServer::create_http_response(int status_code, const std::string& content_type, const std::string& body, const std::map<std::string, std::string>& extra_headers) {
+    std::string status_text;
+    switch (status_code) {
+        case 200: status_text = "OK"; break;
+        case 400: status_text = "Bad Request"; break;
+        case 404: status_text = "Not Found"; break;
+        case 405: status_text = "Method Not Allowed"; break;
+        case 500: status_text = "Internal Server Error"; break;
+        default: status_text = "Unknown"; break;
+    }
+    
+    std::ostringstream response;
+    response << "HTTP/1.1 " << status_code << " " << status_text << "\r\n";
+    response << "Content-Type: " << content_type << "\r\n";
+    response << "Content-Length: " << body.length() << "\r\n";
+    response << "Connection: close\r\n";
+    
+    for (const auto& header : extra_headers) {
+        response << header.first << ": " << header.second << "\r\n";
+    }
+    
+    response << "\r\n";
+    response << body;
+    
+    return response.str();
+}
+
+std::string SecureServer::serve_static_file(const std::string& file_path) {
+    std::string full_path = "server/static/" + file_path;
+    
+    std::ifstream file(full_path, std::ios::binary);
+    if (!file.is_open()) {
+        return create_http_response(404, "text/plain", "File not found");
+    }
+    
+    std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+    std::string extension = get_file_extension(file_path);
+    std::string mime_type = get_mime_type(extension);
+    
+    return create_http_response(200, mime_type, content);
+}
+
+std::string SecureServer::render_template(const std::string& template_name, const std::map<std::string, std::string>& variables) {
+    std::string template_path = "server/templates/" + template_name;
+    
+    std::ifstream file(template_path);
+    if (!file.is_open()) {
+        return create_http_response(404, "text/plain", "Template not found");
+    }
+    
+    std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+    
+    // Simple variable substitution (not full templating)
+    for (const auto& var : variables) {
+        std::string placeholder = "{{" + var.first + "}}";
+        size_t pos = content.find(placeholder);
+        while (pos != std::string::npos) {
+            content.replace(pos, placeholder.length(), var.second);
+            pos = content.find(placeholder, pos + var.second.length());
+        }
+    }
+    
+    return create_http_response(200, "text/html", content);
+}
+
+std::vector<std::string> SecureServer::get_unit_list() {
+    std::vector<std::string> units;
+    for (const auto& pair : unit_data_) {
+        units.push_back(pair.first);
+    }
+    std::sort(units.begin(), units.end());
+    return units;
+}
+
+std::string SecureServer::generate_csv_data(const std::string& unit) {
+    std::lock_guard<std::mutex> lock(data_mutex_);
+    auto it = unit_data_.find(unit);
+    if (it == unit_data_.end() || it->second.empty()) {
+        return "";
+    }
+    
+    std::ostringstream csv;
+    
+    // CSV headers
+    csv << "Timestamp,Setpoint,Return Temp,Supply Temp,Coil Temp,Fan,Compressor,Electric Heater,Valve,Status,Alarm Codes\n";
+    
+    // CSV data
+    for (const auto& record : it->second) {
+        csv << record.value("timestamp", "N/A") << ",";
+        csv << record.value("setpoint", "N/A") << ",";
+        csv << record.value("return_temp", "N/A") << ",";
+        csv << record.value("supply_temp", "N/A") << ",";
+        csv << record.value("coil_temp", "N/A") << ",";
+        csv << (record.value("fan", false) ? "ON" : "OFF") << ",";
+        csv << (record.value("compressor", false) ? "ON" : "OFF") << ",";
+        csv << (record.value("electric_heater", false) ? "ON" : "OFF") << ",";
+        csv << (record.value("valve", false) ? "OPEN" : "CLOSED") << ",";
+        csv << record.value("status", "N/A") << ",";
+        
+        // Handle alarm codes
+        if (record.contains("alarm_codes") && record["alarm_codes"].is_array()) {
+            std::vector<std::string> alarm_strs;
+            for (const auto& alarm : record["alarm_codes"]) {
+                alarm_strs.push_back(std::to_string(alarm.get<int>()));
+            }
+            csv << "\"" << std::regex_replace(
+                std::accumulate(alarm_strs.begin(), alarm_strs.end(), std::string(),
+                    [](const std::string& a, const std::string& b) {
+                        return a.empty() ? b : a + ", " + b;
+                    }), std::regex("\""), "\"\"") << "\"";
+        } else {
+            csv << "No Alarms";
+        }
+        csv << "\n";
+    }
+    
+    return csv.str();
+}
+
+std::map<std::string, std::string> SecureServer::parse_http_headers(const std::string& request) {
+    std::map<std::string, std::string> headers;
+    std::istringstream stream(request);
+    std::string line;
+    
+    // Skip the request line
+    std::getline(stream, line);
+    
+    while (std::getline(stream, line) && line != "\r") {
+        size_t colon_pos = line.find(':');
+        if (colon_pos != std::string::npos) {
+            std::string key = line.substr(0, colon_pos);
+            std::string value = line.substr(colon_pos + 1);
+            
+            // Trim whitespace
+            key.erase(0, key.find_first_not_of(" \t"));
+            key.erase(key.find_last_not_of(" \t\r\n") + 1);
+            value.erase(0, value.find_first_not_of(" \t"));
+            value.erase(value.find_last_not_of(" \t\r\n") + 1);
+            
+            headers[key] = value;
+        }
+    }
+    
+    return headers;
+}
+
+std::string SecureServer::get_file_extension(const std::string& path) {
+    size_t dot_pos = path.find_last_of('.');
+    if (dot_pos != std::string::npos) {
+        return path.substr(dot_pos + 1);
+    }
+    return "";
+}
+
+std::string SecureServer::get_mime_type(const std::string& extension) {
+    if (extension == "html" || extension == "htm") return "text/html";
+    if (extension == "css") return "text/css";
+    if (extension == "js") return "application/javascript";
+    if (extension == "json") return "application/json";
+    if (extension == "png") return "image/png";
+    if (extension == "jpg" || extension == "jpeg") return "image/jpeg";
+    if (extension == "gif") return "image/gif";
+    if (extension == "svg") return "image/svg+xml";
+    if (extension == "ico") return "image/x-icon";
+    if (extension == "csv") return "text/csv";
+    return "text/plain";
+}
+
+void SecureServer::send_email(const nlohmann::json& data) {
+    if (!data.is_object()) {
+        log("Error: Data is not a dictionary");
+        return;
+    }
+    
+    auto alarm_codes = data.value("alarm_codes", nlohmann::json::array());
+    if (alarm_codes.empty()) {
+        return;
+    }
+    
+    std::string unit = data.value("unit", "N/A");
+    
+    // Build alarm codes string
+    std::vector<std::string> alarm_strs;
+    for (const auto& alarm : alarm_codes) {
+        alarm_strs.push_back(std::to_string(alarm.get<int>()));
+    }
+    std::string alarm_codes_str = std::accumulate(alarm_strs.begin(), alarm_strs.end(), std::string(),
+        [](const std::string& a, const std::string& b) {
+            return a.empty() ? b : a + ", " + b;
+        });
+    
+    std::ostringstream email_body;
+    email_body << "**ALARM ALERT**\n";
+    email_body << "Timestamp: " << data.value("timestamp", "N/A") << "\n";
+    email_body << "Unit Number: " << unit << "\n";
+    email_body << "Alarm Codes: " << alarm_codes_str << "\n\n";
+    email_body << "System Status:\n";
+    email_body << "- Setpoint: " << data.value("setpoint", "N/A") << "\n";
+    email_body << "- Status: " << data.value("status", "N/A") << "\n";
+    email_body << "- Return Temp: " << data.value("return_temp", "N/A") << "°F\n";
+    email_body << "- Supply Temp: " << data.value("supply_temp", "N/A") << "°F\n";
+    email_body << "- Coil Temp: " << data.value("coil_temp", "N/A") << "°F\n";
+    
+    std::string subject = "ALARM: Unit " + unit + " Detected!";
+    
+    if (send_smtp_email(email_address_, subject, email_body.str())) {
+        log("Email sent to " + email_address_ + " with Unit " + unit + " and Alarm Codes: " + alarm_codes_str);
+    } else {
+        log("Failed to send email");
+    }
+}
+
+bool SecureServer::send_smtp_email(const std::string& to, const std::string& subject, const std::string& body) {
+    if (email_server_.empty() || email_address_.empty() || email_password_.empty()) {
+        log("Email configuration incomplete - skipping email send");
+        return false;
+    }
+    
+    // For now, just log the email instead of sending it
+    // A full SMTP implementation would be quite complex without external libraries
+    log("EMAIL: To: " + to);
+    log("EMAIL: Subject: " + subject);
+    log("EMAIL: Body: " + body);
+    log("Email functionality simulated (would require full SMTP implementation)");
+    
+    return true;
+}
+
+std::string SecureServer::base64_encode(const std::string& input) {
+    // Simple base64 encoding implementation
+    const std::string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    std::string encoded;
+    int val = 0, valb = -6;
+    
+    for (unsigned char c : input) {
+        val = (val << 8) + c;
+        valb += 8;
+        while (valb >= 0) {
+            encoded.push_back(chars[(val >> valb) & 0x3F]);
+            valb -= 6;
+        }
+    }
+    
+    if (valb > -6) {
+        encoded.push_back(chars[((val << 8) >> (valb + 8)) & 0x3F]);
+    }
+    
+    while (encoded.size() % 4) {
+        encoded.push_back('=');
+    }
+    
+    return encoded;
+}

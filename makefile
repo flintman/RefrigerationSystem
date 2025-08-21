@@ -62,6 +62,16 @@ all: deb
 	@echo "--------------------------------------------------------------------------------"
 	@echo "Build completed successfully!"
 
+# Server target
+server:
+	@echo "Building C++ server..."
+	$(MAKE) -C server
+	@echo "Server build completed!"
+
+# Clean server
+clean-server:
+	$(MAKE) -C server clean
+
 # Linking
 $(TARGET): $(OBJS) $(VENDOR_OBJS)
 	@mkdir -p $(BIN_DIR)
@@ -133,4 +143,4 @@ deb: $(TARGET) $(TOOL_TARGET)
 clean:
 	rm -rf $(BUILD_DIR)
 
-.PHONY: all clean
+.PHONY: all clean server clean-server
