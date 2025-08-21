@@ -185,6 +185,11 @@ void SecureServer::stop() {
 }
 
 SSL_CTX* SecureServer::create_ssl_context() {
+    if (cert_file_.empty() || key_file_.empty()) {
+        log("SSL certificates not configured - running in test mode without SSL");
+        return nullptr;
+    }
+    
     const SSL_METHOD* method = TLS_server_method();
     SSL_CTX* ctx = SSL_CTX_new(method);
     
@@ -229,15 +234,16 @@ SSL_CTX* SecureServer::create_ssl_context() {
 
 void SecureServer::start_socket_server() {
     SSL_CTX* ctx = create_ssl_context();
-    if (!ctx) {
-        log("Failed to create SSL context");
-        return;
+    bool use_ssl = (ctx != nullptr);
+    
+    if (!use_ssl) {
+        log("WARNING: Running socket server in non-SSL mode for testing");
     }
     
     socket_server_fd_ = socket(AF_INET, SOCK_STREAM, 0);
     if (socket_server_fd_ < 0) {
         log("Failed to create socket");
-        SSL_CTX_free(ctx);
+        if (ctx) SSL_CTX_free(ctx);
         return;
     }
     
@@ -252,18 +258,19 @@ void SecureServer::start_socket_server() {
     if (bind(socket_server_fd_, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
         log("Failed to bind socket server");
         close(socket_server_fd_);
-        SSL_CTX_free(ctx);
+        if (ctx) SSL_CTX_free(ctx);
         return;
     }
     
     if (listen(socket_server_fd_, 10) < 0) {
         log("Failed to listen on socket server");
         close(socket_server_fd_);
-        SSL_CTX_free(ctx);
+        if (ctx) SSL_CTX_free(ctx);
         return;
     }
     
-    log("Secure socket server listening on " + host_ + ":" + std::to_string(port_));
+    log("Socket server listening on " + host_ + ":" + std::to_string(port_) + 
+        (use_ssl ? " (SSL)" : " (non-SSL)"));
     
     while (running_) {
         struct sockaddr_in client_addr;
@@ -290,40 +297,48 @@ void SecureServer::start_socket_server() {
             }
         }
         
-        // Create SSL connection
-        SSL* ssl = SSL_new(ctx);
-        SSL_set_fd(ssl, client_fd);
-        
-        if (SSL_accept(ssl) <= 0) {
-            log("SSL handshake failed for " + client_ip);
-            ERR_print_errors_fp(stderr);
+        if (use_ssl) {
+            // Create SSL connection
+            SSL* ssl = SSL_new(ctx);
+            SSL_set_fd(ssl, client_fd);
             
-            // Track failed attempts
-            failed_attempts_[client_ip]++;
-            if (failed_attempts_[client_ip] >= max_attempts_) {
-                std::lock_guard<std::mutex> lock(blocked_ips_mutex_);
-                blocked_ips_.insert(client_ip);
-                save_blocked_ips();
-                log("IP " + client_ip + " blocked after " + std::to_string(max_attempts_) + " failed attempts");
+            if (SSL_accept(ssl) <= 0) {
+                log("SSL handshake failed for " + client_ip);
+                ERR_print_errors_fp(stderr);
+                
+                // Track failed attempts
+                failed_attempts_[client_ip]++;
+                if (failed_attempts_[client_ip] >= max_attempts_) {
+                    std::lock_guard<std::mutex> lock(blocked_ips_mutex_);
+                    blocked_ips_.insert(client_ip);
+                    save_blocked_ips();
+                    log("IP " + client_ip + " blocked after " + std::to_string(max_attempts_) + " failed attempts");
+                }
+                
+                SSL_free(ssl);
+                close(client_fd);
+                continue;
             }
             
-            SSL_free(ssl);
-            close(client_fd);
-            continue;
+            log("SSL handshake complete for " + client_ip);
+            
+            // Handle client in a separate thread
+            std::thread([this, ssl, client_fd, client_ip]() {
+                handle_client(ssl, client_ip);
+                SSL_shutdown(ssl);
+                SSL_free(ssl);
+                close(client_fd);
+            }).detach();
+        } else {
+            // Handle client without SSL for testing
+            std::thread([this, client_fd, client_ip]() {
+                handle_client_no_ssl(client_fd, client_ip);
+                close(client_fd);
+            }).detach();
         }
-        
-        log("SSL handshake complete for " + client_ip);
-        
-        // Handle client in a separate thread
-        std::thread([this, ssl, client_fd, client_ip]() {
-            handle_client(ssl, client_ip);
-            SSL_shutdown(ssl);
-            SSL_free(ssl);
-            close(client_fd);
-        }).detach();
     }
     
-    SSL_CTX_free(ctx);
+    if (ctx) SSL_CTX_free(ctx);
 }
 
 void SecureServer::handle_client(SSL* ssl, const std::string& client_ip) {
@@ -427,6 +442,119 @@ void SecureServer::handle_client(SSL* ssl, const std::string& client_ip) {
             // Send response
             std::string response_str = response.dump();
             SSL_write(ssl, response_str.c_str(), response_str.length());
+            log("Sent to " + client_ip + ": " + response_str);
+            
+            cleanup_old_data();
+        }
+        
+    } catch (const std::exception& e) {
+        log("Error parsing JSON from " + client_ip + ": " + e.what());
+    }
+    
+    log("Client " + client_ip + " disconnected");
+}
+
+void SecureServer::handle_client_no_ssl(int client_fd, const std::string& client_ip) {
+    log("Handling client " + client_ip + " (non-SSL)");
+    
+    char buffer[1024] = {0};
+    std::string data;
+    
+    // Read data from client
+    while (running_) {
+        int bytes_read = recv(client_fd, buffer, sizeof(buffer) - 1, 0);
+        if (bytes_read <= 0) {
+            log("No more data from " + client_ip);
+            break;
+        }
+        
+        buffer[bytes_read] = '\0';
+        data += buffer;
+        
+        // Check if we have a complete JSON message
+        if (data.find('}') != std::string::npos) {
+            log("End of JSON detected from " + client_ip);
+            break;
+        }
+    }
+    
+    if (data.empty()) {
+        log("No data received from " + client_ip);
+        return;
+    }
+    
+    try {
+        nlohmann::json received_data = nlohmann::json::parse(data);
+        log("Received from " + client_ip + ": " + received_data.dump());
+        
+        // Process alarm codes if they're in string format
+        if (received_data.contains("alarm_codes") && received_data["alarm_codes"].is_string()) {
+            std::string alarm_codes_str = received_data["alarm_codes"];
+            std::vector<int> alarm_codes;
+            std::stringstream ss(alarm_codes_str);
+            std::string code;
+            while (std::getline(ss, code, ',')) {
+                code.erase(0, code.find_first_not_of(" \t"));
+                code.erase(code.find_last_not_of(" \t") + 1);
+                if (!code.empty() && std::all_of(code.begin(), code.end(), ::isdigit)) {
+                    alarm_codes.push_back(std::stoi(code));
+                }
+            }
+            received_data["alarm_codes"] = alarm_codes;
+        }
+        
+        if (received_data.contains("unit")) {
+            std::string unit = received_data["unit"];
+            append_data(received_data);
+            
+            nlohmann::json response;
+            response["status"] = "Received";
+            
+            // Check for pending commands
+            {
+                std::lock_guard<std::mutex> lock(data_mutex_);
+                auto it = pending_commands_.find(unit);
+                if (it != pending_commands_.end()) {
+                    response["status"] = it->second;
+                    pending_commands_.erase(it);
+                    log("Sending command " + it->second + " to Unit " + unit);
+                }
+            }
+            
+            // Check for alarms and send email
+            if (received_data.contains("alarm_codes") && !received_data["alarm_codes"].empty()) {
+                std::vector<int> current_alarms = received_data["alarm_codes"];
+                
+                // Check if alarms have changed
+                bool send_email = false;
+                {
+                    std::lock_guard<std::mutex> lock(data_mutex_);
+                    auto it = active_alarms_.find(unit);
+                    if (it == active_alarms_.end() || it->second != current_alarms) {
+                        active_alarms_[unit] = current_alarms;
+                        send_email = true;
+                    }
+                }
+                
+                if (send_email) {
+                    log("Sending email for Unit " + unit + " with alarms");
+                    this->send_email(received_data);
+                } else {
+                    log("Alarm for Unit " + unit + " already sent. Skipping email.");
+                }
+            } else {
+                // Clear alarms for this unit
+                std::lock_guard<std::mutex> lock(data_mutex_);
+                auto it = active_alarms_.find(unit);
+                if (it != active_alarms_.end()) {
+                    log("Unit " + unit + " alarms cleared. Ready for next alert.");
+                    active_alarms_.erase(it);
+                }
+            }
+            
+            // Send response
+            std::string response_str = response.dump();
+            send(client_fd, response_str.c_str(), response_str.length(), 0);
             log("Sent to " + client_ip + ": " + response_str);
             
             cleanup_old_data();
@@ -783,28 +911,36 @@ std::string SecureServer::generate_csv_data(const std::string& unit) {
     
     // CSV data
     for (const auto& record : it->second) {
-        csv << record.value("timestamp", "N/A") << ",";
-        csv << record.value("setpoint", "N/A") << ",";
-        csv << record.value("return_temp", "N/A") << ",";
-        csv << record.value("supply_temp", "N/A") << ",";
-        csv << record.value("coil_temp", "N/A") << ",";
+        csv << "\"" << record.value("timestamp", "N/A") << "\",";
+        csv << record.value("setpoint", 0.0) << ",";
+        csv << record.value("return_temp", 0.0) << ",";
+        csv << record.value("supply_temp", 0.0) << ",";
+        csv << record.value("coil_temp", 0.0) << ",";
         csv << (record.value("fan", false) ? "ON" : "OFF") << ",";
         csv << (record.value("compressor", false) ? "ON" : "OFF") << ",";
         csv << (record.value("electric_heater", false) ? "ON" : "OFF") << ",";
         csv << (record.value("valve", false) ? "OPEN" : "CLOSED") << ",";
-        csv << record.value("status", "N/A") << ",";
+        csv << "\"" << record.value("status", "N/A") << "\",";
         
         // Handle alarm codes
         if (record.contains("alarm_codes") && record["alarm_codes"].is_array()) {
             std::vector<std::string> alarm_strs;
             for (const auto& alarm : record["alarm_codes"]) {
-                alarm_strs.push_back(std::to_string(alarm.get<int>()));
+                if (alarm.is_number()) {
+                    alarm_strs.push_back(std::to_string(alarm.get<int>()));
+                } else if (alarm.is_string()) {
+                    alarm_strs.push_back(alarm.get<std::string>());
+                }
             }
-            csv << "\"" << std::regex_replace(
-                std::accumulate(alarm_strs.begin(), alarm_strs.end(), std::string(),
-                    [](const std::string& a, const std::string& b) {
-                        return a.empty() ? b : a + ", " + b;
-                    }), std::regex("\""), "\"\"") << "\"";
+            if (!alarm_strs.empty()) {
+                csv << "\"" << std::regex_replace(
+                    std::accumulate(alarm_strs.begin(), alarm_strs.end(), std::string(),
+                        [](const std::string& a, const std::string& b) {
+                            return a.empty() ? b : a + ", " + b;
+                        }), std::regex("\""), "\"\"") << "\"";
+            } else {
+                csv << "No Alarms";
+            }
         } else {
             csv << "No Alarms";
         }

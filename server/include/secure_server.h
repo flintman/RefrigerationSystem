@@ -78,6 +78,7 @@ private:
     // Socket server methods
     void start_socket_server();
     void handle_client(SSL* ssl, const std::string& client_ip);
+    void handle_client_no_ssl(int client_fd, const std::string& client_ip);
     SSL_CTX* create_ssl_context();
     
     // Web server methods

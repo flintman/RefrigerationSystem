@@ -1,0 +1,16 @@
+[
+    {
+        "unit": "Unit002",
+        "timestamp": "15:00:20  01:15:2024",
+        "setpoint": 40.0,
+        "return_temp": 41.5,
+        "supply_temp": 38.2,
+        "coil_temp": 35.1,
+        "fan": true,
+        "compressor": false,
+        "electric_heater": true,
+        "valve": false,
+        "status": "Heating",
+        "alarm_codes": []
+    }
+]

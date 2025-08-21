@@ -1,0 +1,30 @@
+[
+    {
+        "unit": "Unit001",
+        "timestamp": "14:30:15  01:15:2024",
+        "setpoint": 35.0,
+        "return_temp": 36.2,
+        "supply_temp": 32.8,
+        "coil_temp": 28.5,
+        "fan": true,
+        "compressor": true,
+        "electric_heater": false,
+        "valve": true,
+        "status": "Cooling",
+        "alarm_codes": []
+    },
+    {
+        "unit": "Unit001",
+        "timestamp": "14:35:15  01:15:2024",
+        "setpoint": 35.0,
+        "return_temp": 35.8,
+        "supply_temp": 32.1,
+        "coil_temp": 27.9,
+        "fan": true,
+        "compressor": true,
+        "electric_heater": false,
+        "valve": true,
+        "status": "Cooling",
+        "alarm_codes": [101, 205]
+    }
+]
