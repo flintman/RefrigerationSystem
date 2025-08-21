@@ -1,0 +1,16 @@
+[
+    {
+        "alarm_codes": [],
+        "coil_temp": 38.1,
+        "compressor": false,
+        "electric_heater": true,
+        "fan": true,
+        "return_temp": 43.5,
+        "setpoint": 42.0,
+        "status": "Heating",
+        "supply_temp": 40.2,
+        "timestamp": "16:00:00  01:15:2024",
+        "unit": "Unit003",
+        "valve": false
+    }
+]
