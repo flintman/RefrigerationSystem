@@ -125,19 +125,43 @@
                 .then(data => {
                     let tableBody = document.getElementById("unit-list-body");
                     tableBody.innerHTML = "";
-                    
+
                     if (data.units && data.units.length > 0) {
                         data.units.forEach(unit => {
-                            let latestEntry = data.unit_data[unit] && data.unit_data[unit].length > 0 
-                                ? data.unit_data[unit][data.unit_data[unit].length - 1] 
+                            let latestEntry = data.unit_data[unit] && data.unit_data[unit].length > 0
+                                ? data.unit_data[unit][data.unit_data[unit].length - 1]
                                 : null;
-                            
+
                             let row = document.createElement("tr");
-                            let timestamp = latestEntry ? new Date(latestEntry.timestamp).toLocaleString() : 'N/A';
-                            let alarms = latestEntry && latestEntry.alarm_codes && latestEntry.alarm_codes.length > 0 
-                                ? latestEntry.alarm_codes.join(', ') 
+                            let timestamp = 'N/A';
+                            if (latestEntry && latestEntry.timestamp) {
+                                // Parse timestamp in format "HH:MM:SS  MM:DD:YYYY"
+                                // Example: "00:13:35  07:23:2025"
+                                let parts = latestEntry.timestamp.split('  ');
+                                if (parts.length === 2) {
+                                    let time = parts[0].trim();
+                                    let date = parts[1].trim();
+                                    // Convert to ISO format: YYYY-MM-DDTHH:MM:SS
+                                    let dateParts = date.split(':');
+                                    if (dateParts.length === 3) {
+                                        let isoString = `${dateParts[2]}-${dateParts[0].padStart(2, '0')}-${dateParts[1].padStart(2, '0')}T${time}`;
+                                        let dateObj = new Date(isoString);
+                                        if (!isNaN(dateObj.getTime())) {
+                                            timestamp = dateObj.toLocaleString();
+                                        } else {
+                                            timestamp = latestEntry.timestamp;
+                                        }
+                                    } else {
+                                        timestamp = latestEntry.timestamp;
+                                    }
+                                } else {
+                                    timestamp = latestEntry.timestamp;
+                                }
+                            }
+                            let alarms = latestEntry && latestEntry.alarm_codes && latestEntry.alarm_codes.length > 0
+                                ? latestEntry.alarm_codes.join(', ')
                                 : 'No Alarms';
-                            
+
                             row.innerHTML = `
                                 <td><a href="#" onclick="loadData('${unit}')">${unit}</a></td>
                                 <td>${timestamp}</td>
