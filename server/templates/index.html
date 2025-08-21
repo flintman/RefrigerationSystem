@@ -63,60 +63,95 @@
             document.getElementById("command-buttons").style.display = "block";
 
             fetch(`/unit/${unit}`)
-                .then(response => response.json())
-                .then(data => {
-                    data.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+            .then(response => response.json())
+            .then(data => {
+                // Ensure data is always an array
+                if (!Array.isArray(data)) {
+                data = [data];
+                }
 
-                    let tableBody = document.getElementById('unit-data-body');
-                    tableBody.innerHTML = "";
-
-                    if (data.length === 0) {
-                        tableBody.innerHTML = "<tr><td colspan='11'>No data available.</td></tr>";
-                        return;
+                // Sort by timestamp (convert custom format to Date)
+                data.sort((a, b) => {
+                function parseTimestamp(ts) {
+                    // "00:13:35  07:23:2025"
+                    let parts = ts.split('  ');
+                    if (parts.length === 2) {
+                    let time = parts[0].trim();
+                    let date = parts[1].trim();
+                    let dateParts = date.split(':');
+                    if (dateParts.length === 3) {
+                        // YYYY-MM-DDTHH:MM:SS
+                        let isoString = `${dateParts[2]}-${dateParts[0].padStart(2, '0')}-${dateParts[1].padStart(2, '0')}T${time}`;
+                        return new Date(isoString);
                     }
+                    }
+                    return new Date(ts);
+                }
+                return parseTimestamp(b.timestamp) - parseTimestamp(a.timestamp);
+                });
 
-                    // Get the latest entry
-                    const latestEntry = data[0];
+                let tableBody = document.getElementById('unit-data-body');
+                tableBody.innerHTML = "";
 
-                    // Update button visibility based on conditions
-                    const resetBtn = document.getElementById("reset-alarm-btn");
-                    const defrostBtn = document.getElementById("defrost-btn");
+                if (data.length === 0) {
+                tableBody.innerHTML = "<tr><td colspan='11'>No data available.</td></tr>";
+                return;
+                }
 
-                    // Show alarm reset button only if there are active alarms
-                    resetBtn.style.display =
-                        latestEntry.alarm_codes && latestEntry.alarm_codes.length > 0 ? "inline-block" : "none";
+                // Get the latest entry
+                const latestEntry = data[0];
 
-                    // Show defrost button only if coil temp is below 45F
-                    defrostBtn.style.display =
-                        latestEntry.coil_temp !== undefined && latestEntry.coil_temp < 45 ? "inline-block" : "none";
+                // Update button visibility based on conditions
+                const resetBtn = document.getElementById("reset-alarm-btn");
+                const defrostBtn = document.getElementById("defrost-btn");
 
-                    // Rest of your existing table population code
-                    data.forEach(entry => {
-                        let formattedTimestamp = new Date(entry.timestamp)
-                            .toISOString()
-                            .replace("T", " ")
-                            .slice(0, -5);
+                // Show alarm reset button only if there are active alarms
+                resetBtn.style.display =
+                latestEntry.alarm_codes && latestEntry.alarm_codes.length > 0 ? "inline-block" : "none";
 
-                        let row = document.createElement("tr");
-                        row.innerHTML = `
-                            <td>${formattedTimestamp}</td>
-                            <td>${entry.setpoint}</td>
-                            <td>${entry.return_temp}</td>
-                            <td>${entry.supply_temp}</td>
-                            <td>${entry.coil_temp}</td>
-                            <td>${String(entry.fan).toLowerCase() === "true" ? 'ON' : 'OFF'}</td>
-                            <td>${String(entry.compressor).toLowerCase() === "true" ? 'ON' : 'OFF'}</td>
-                            <td>${String(entry.electric_heater).toLowerCase() === "true" ? 'ON' : 'OFF'}</td>
-                            <td>${String(entry.valve).toLowerCase() === "true" ? 'OPEN' : 'CLOSED'}</td>
-                            <td>${entry.status}</td>
-                            <td>${entry.alarm_codes && entry.alarm_codes.length ? entry.alarm_codes.join(', ') : 'No Alarms'}</td>
-                        `;
-                        tableBody.appendChild(row);
-                    });
+                // Show defrost button only if coil temp is below 45F
+                let coilTempNum = parseFloat(latestEntry.coil_temp);
+                defrostBtn.style.display =
+                !isNaN(coilTempNum) && coilTempNum < 45 ? "inline-block" : "none";
 
-                    document.getElementById("download-btn").style.display = "inline-block";
-                })
-                .catch(error => console.error('Error fetching data:', error));
+                // Populate table
+                data.forEach(entry => {
+                // Format timestamp
+                let formattedTimestamp = entry.timestamp;
+                let parts = entry.timestamp.split('  ');
+                if (parts.length === 2) {
+                    let time = parts[0].trim();
+                    let date = parts[1].trim();
+                    let dateParts = date.split(':');
+                    if (dateParts.length === 3) {
+                    let isoString = `${dateParts[2]}-${dateParts[0].padStart(2, '0')}-${dateParts[1].padStart(2, '0')}T${time}`;
+                    let dateObj = new Date(isoString);
+                    if (!isNaN(dateObj.getTime())) {
+                        formattedTimestamp = dateObj.toLocaleString();
+                    }
+                    }
+                }
+
+                let row = document.createElement("tr");
+                row.innerHTML = `
+                    <td>${formattedTimestamp}</td>
+                    <td>${entry.setpoint}</td>
+                    <td>${entry.return_temp}</td>
+                    <td>${entry.supply_temp}</td>
+                    <td>${entry.coil_temp}</td>
+                    <td>${String(entry.fan).toLowerCase() === "true" ? 'ON' : 'OFF'}</td>
+                    <td>${String(entry.compressor).toLowerCase() === "true" ? 'ON' : 'OFF'}</td>
+                    <td>${String(entry.electric_heater).toLowerCase() === "true" ? 'ON' : 'OFF'}</td>
+                    <td>${String(entry.valve).toLowerCase() === "true" ? 'OPEN' : 'CLOSED'}</td>
+                    <td>${entry.status}</td>
+                    <td>${entry.alarm_codes && entry.alarm_codes.length ? entry.alarm_codes.join(', ') : 'No Alarms'}</td>
+                `;
+                tableBody.appendChild(row);
+                });
+
+                document.getElementById("download-btn").style.display = "inline-block";
+            })
+            .catch(error => console.error('Error fetching data:', error));
         }
 
         function updateUnitList() {
