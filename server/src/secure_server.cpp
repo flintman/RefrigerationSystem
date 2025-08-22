@@ -964,21 +964,69 @@ std::string SecureServer::generate_csv_data(const std::string& unit) {
     }
 
     std::ostringstream csv;
-
-    // CSV headers
     csv << "Timestamp,Setpoint,Return Temp,Supply Temp,Coil Temp,Fan,Compressor,Electric Heater,Valve,Status,Alarm Codes\n";
 
-    // CSV data
-    for (const auto& record : it->second) {
-        csv << "\"" << record.value("timestamp", "N/A") << "\",";
-        csv << record.value("setpoint", 0.0) << ",";
-        csv << record.value("return_temp", 0.0) << ",";
-        csv << record.value("supply_temp", 0.0) << ",";
-        csv << record.value("coil_temp", 0.0) << ",";
-        csv << (record.value("fan", false) ? "ON" : "OFF") << ",";
-        csv << (record.value("compressor", false) ? "ON" : "OFF") << ",";
-        csv << (record.value("electric_heater", false) ? "ON" : "OFF") << ",";
-        csv << (record.value("valve", false) ? "OPEN" : "CLOSED") << ",";
+    auto get_double = [](const nlohmann::json& j, const std::string& key) -> double {
+        if (!j.contains(key)) return 0.0;
+        if (j[key].is_number()) return j[key].get<double>();
+        if (j[key].is_string()) {
+            try { return std::stod(j[key].get<std::string>()); } catch (...) { return 0.0; }
+        }
+        return 0.0;
+    };
+
+    auto get_bool = [](const nlohmann::json& j, const std::string& key) -> bool {
+        if (!j.contains(key)) return false;
+        if (j[key].is_boolean()) return j[key].get<bool>();
+        if (j[key].is_string()) {
+            std::string val = j[key].get<std::string>();
+            std::transform(val.begin(), val.end(), val.begin(), ::tolower);
+            return val == "true";
+        }
+        return false;
+    };
+
+    // Sort records by date and time part of timestamp ascending (oldest first)
+    std::vector<nlohmann::json> sorted_records = it->second;
+    std::sort(sorted_records.begin(), sorted_records.end(),
+        [](const nlohmann::json& a, const nlohmann::json& b) {
+            auto parse_datetime = [](const nlohmann::json& j) -> std::tuple<std::string, std::string> {
+                std::string ts = j.value("timestamp", "");
+                size_t space_pos = ts.find(' ');
+                if (space_pos != std::string::npos) {
+                    std::string time_part = ts.substr(0, space_pos);
+                    std::string date_part = ts.substr(space_pos + 1);
+                    return std::make_tuple(date_part, time_part); // (MM:DD:YYYY, HH:MM:SS)
+                }
+                return std::make_tuple(ts, "");
+            };
+            auto [date_a, time_a] = parse_datetime(a);
+            auto [date_b, time_b] = parse_datetime(b);
+            if (date_a == date_b) {
+                return time_a < time_b;
+            }
+            return date_a < date_b;
+        });
+
+    for (const auto& record : sorted_records) {
+        // Reformat timestamp from "HH:MM:SS MM:DD:YYYY" to "MM:DD:YYYY HH:MM:SS"
+        std::string timestamp = record.value("timestamp", "N/A");
+        std::string formatted_timestamp = timestamp;
+        size_t space_pos = timestamp.find(' ');
+        if (space_pos != std::string::npos) {
+            std::string time_part = timestamp.substr(0, space_pos);
+            std::string date_part = timestamp.substr(space_pos + 1);
+            formatted_timestamp = date_part + " " + time_part;
+        }
+        csv << "\"" << formatted_timestamp << "\",";
+        csv << get_double(record, "setpoint") << ",";
+        csv << get_double(record, "return_temp") << ",";
+        csv << get_double(record, "supply_temp") << ",";
+        csv << get_double(record, "coil_temp") << ",";
+        csv << (get_bool(record, "fan") ? "ON" : "OFF") << ",";
+        csv << (get_bool(record, "compressor") ? "ON" : "OFF") << ",";
+        csv << (get_bool(record, "electric_heater") ? "ON" : "OFF") << ",";
+        csv << (get_bool(record, "valve") ? "OPEN" : "CLOSED") << ",";
         csv << "\"" << record.value("status", "N/A") << "\",";
 
         // Handle alarm codes
