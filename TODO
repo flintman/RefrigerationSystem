@@ -5,5 +5,4 @@
 
 
 ### NEED TO FIX
-- email
 - package server to deb file.  See about generating the .env file on install
