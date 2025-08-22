@@ -218,11 +218,13 @@ void SecureServer::stop() {
     running_ = false;
 
     if (socket_server_fd_ != -1) {
+        shutdown(socket_server_fd_, SHUT_RDWR);
         close(socket_server_fd_);
         socket_server_fd_ = -1;
     }
 
     if (web_server_fd_ != -1) {
+        shutdown(web_server_fd_, SHUT_RDWR);
         close(web_server_fd_);
         web_server_fd_ = -1;
     }
