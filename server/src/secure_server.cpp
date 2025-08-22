@@ -137,24 +137,42 @@ void SecureServer::load_data() {
     std::lock_guard<std::mutex> lock(data_mutex_);
     unit_data_.clear();
 
+    log("Loading data from directory: " + std::string(DATA_DIRECTORY));
     for (const auto& entry : std::filesystem::directory_iterator(DATA_DIRECTORY)) {
         if (entry.is_regular_file() && entry.path().extension() == ".json") {
             std::string filename = entry.path().filename().string();
+            //log("Found file: " + filename);
             size_t underscore_pos = filename.find('_');
             if (underscore_pos != std::string::npos) {
                 std::string unit = filename.substr(0, underscore_pos);
+                //log("Processing file for unit: " + unit + ", path: " + entry.path().string());
                 process_file(unit, entry.path().string());
+            } else {
+                log("Filename does not match expected format: " + filename);
             }
         }
     }
+    log("Finished loading data. Units loaded: " + std::to_string(unit_data_.size()));
 }
 
 void SecureServer::process_file(const std::string& unit, const std::string& file_path) {
+    //log("Processing file for unit: " + unit + ", path: " + file_path);
     std::ifstream file(file_path);
     if (!file.is_open()) return;
 
+    // Check if file is empty
+    if (file.peek() == std::ifstream::traits_type::eof()) {
+        log("File " + file_path + " is empty. Skipping.");
+        return;
+    }
+
     nlohmann::json j;
-    file >> j;
+    try {
+        file >> j;
+    } catch (const std::exception& e) {
+        log("Error parsing JSON in file: " + file_path + " - " + e.what());
+        return;
+    }
 
     if (!j.is_array()) return;
 
@@ -165,13 +183,10 @@ void SecureServer::process_file(const std::string& unit, const std::string& file
     for (const auto& record : j) {
         if (record.is_object()) {
             nlohmann::json processed_record = record;
-            // Note: timestamp parsing would need to be implemented properly
-            // For now, we'll keep the timestamp as-is
             unit_data_[unit].push_back(processed_record);
         }
     }
 
-    // Sort by timestamp (assuming timestamp is a string)
     std::sort(unit_data_[unit].begin(), unit_data_[unit].end(),
         [](const nlohmann::json& a, const nlohmann::json& b) {
             return a.value("timestamp", "") < b.value("timestamp", "");
@@ -428,6 +443,7 @@ void SecureServer::handle_client(SSL* ssl, const std::string& client_ip) {
 
         if (received_data.contains("unit")) {
             std::string unit = received_data["unit"];
+            log("Processing data for unit " + unit + ": " + received_data.dump());
             append_data(received_data);
 
             nlohmann::json response;
@@ -605,7 +621,7 @@ void SecureServer::handle_client_no_ssl(int client_fd, const std::string& client
 
 void SecureServer::append_data(const nlohmann::json& data) {
     std::string unit = data.value("unit", "unknown");
-
+    log("Appending data for Unit " + unit + ": " + data.dump());
     auto now = std::chrono::system_clock::now();
     auto time_t = std::chrono::system_clock::to_time_t(now);
     std::tm* tm = std::localtime(&time_t);
@@ -627,14 +643,19 @@ void SecureServer::append_data(const nlohmann::json& data) {
         if (!existing_data.is_array()) {
             existing_data = nlohmann::json::array({existing_data});
         }
+        infile.close();
     }
 
     // Add new data
     existing_data.push_back(data);
 
-    // Write back to file
-    std::ofstream outfile(filepath);
-    outfile << existing_data.dump(4);
+    // Write back to file and flush
+    {
+        std::ofstream outfile(filepath);
+        outfile << existing_data.dump(4);
+        outfile.flush();
+        outfile.close();
+    }
 
     log("Data appended to " + filepath);
 
