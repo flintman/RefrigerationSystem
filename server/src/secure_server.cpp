@@ -41,8 +41,16 @@ SecureServer::~SecureServer() {
     EVP_cleanup();
 }
 
+static std::string get_server_root_directory() {
+        const char* home = getenv("HOME");
+        if (home) {
+            return std::string(home) + "/refrigeration-server";
+        }
+        return "/tmp/refrgieration-server";
+    }
+
 // Helper function to load .env file
-void load_dotenv(const std::string& filename = ".env") {
+void load_dotenv(const std::string& filename = std::string(get_server_root_directory()) + "/.env") {
     std::ifstream file(filename);
     if (!file.is_open()) return;
 
@@ -100,8 +108,9 @@ void SecureServer::load_environment_variables() {
 }
 
 void SecureServer::create_data_directory() {
-    if (!std::filesystem::exists(DATA_DIRECTORY)) {
-        std::filesystem::create_directories(DATA_DIRECTORY);
+    std::string data_dir = std::string(get_server_root_directory()) + "/" + DATA_DIRECTORY;
+    if (!std::filesystem::exists(data_dir)) {
+        std::filesystem::create_directories(data_dir);
     }
 }
 
@@ -109,7 +118,8 @@ void SecureServer::load_blocked_ips() {
     std::lock_guard<std::mutex> lock(blocked_ips_mutex_);
     blocked_ips_.clear();
 
-    std::ifstream file(BLOCKED_IPS_FILE);
+    std::string blocked_ips_path = std::string(get_server_root_directory()) + "/" + BLOCKED_IPS_FILE;
+    std::ifstream file(blocked_ips_path);
     if (file.is_open()) {
         nlohmann::json j;
         file >> j;
@@ -130,7 +140,8 @@ void SecureServer::save_blocked_ips() {
         j.push_back(ip);
     }
 
-    std::ofstream file(BLOCKED_IPS_FILE);
+    std::string blocked_ips_path = std::string(get_server_root_directory()) + "/" + BLOCKED_IPS_FILE;
+    std::ofstream file(blocked_ips_path);
     file << j.dump(4);
 }
 
@@ -138,8 +149,9 @@ void SecureServer::load_data() {
     std::lock_guard<std::mutex> lock(data_mutex_);
     unit_data_.clear();
 
-    log("Loading data from directory: " + std::string(DATA_DIRECTORY));
-    for (const auto& entry : std::filesystem::directory_iterator(DATA_DIRECTORY)) {
+    std::string data_dir = std::string(get_server_root_directory()) + "/" + DATA_DIRECTORY;
+    log("Loading data from directory: " + data_dir);
+    for (const auto& entry : std::filesystem::directory_iterator(data_dir)) {
         if (entry.is_regular_file() && entry.path().extension() == ".json") {
             std::string filename = entry.path().filename().string();
             //log("Found file: " + filename);
@@ -633,7 +645,8 @@ void SecureServer::append_data(const nlohmann::json& data) {
     date_stream << std::put_time(tm, "%Y-%m-%d");
     std::string date_str = date_stream.str();
 
-    std::string filepath = std::string(DATA_DIRECTORY) + "/" + unit + "_" + date_str + ".json";
+    std::string data_dir = std::string(get_server_root_directory()) + "/" + DATA_DIRECTORY;
+    std::string filepath = data_dir + "/" + unit + "_" + date_str + ".json";
 
     log("Appending data for Unit " + unit + " to " + filepath);
 
@@ -671,7 +684,8 @@ void SecureServer::cleanup_old_data(int days) {
     auto cutoff = now - std::chrono::hours(24 * days);
 
     try {
-        for (const auto& entry : std::filesystem::directory_iterator(DATA_DIRECTORY)) {
+        std::string data_dir = std::string(get_server_root_directory()) + "/" + DATA_DIRECTORY;
+        for (const auto& entry : std::filesystem::directory_iterator(data_dir)) {
             if (entry.is_regular_file() && entry.path().extension() == ".json") {
                 std::string filename = entry.path().filename().string();
 
