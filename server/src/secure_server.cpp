@@ -52,37 +52,7 @@ static std::string get_server_root_directory() {
 // Helper function to load .env file
 void load_dotenv(const std::string& filename = std::string(get_server_root_directory()) + "/.env") {
     std::ifstream file(filename);
-    if (!file.is_open()) {
-        std::cout << "Environment file not found: " << filename << std::endl;
-        std::cout << "Please fill out the following settings to create a new .env file:" << std::endl;
-
-        std::map<std::string, std::string> env_vars = {
-            {"EMAIL_SERVER", ""},
-            {"EMAIL_ADDRESS", ""},
-            {"EMAIL_PASSWORD", ""},
-            {"CERT_FILE", ""},
-            {"KEY_FILE", ""},
-            {"CA_CERT_FILE", ""}
-        };
-
-        for (auto& [key, value] : env_vars) {
-            std::cout << key << ": ";
-            std::getline(std::cin, value);
-        }
-
-        std::ofstream new_file(filename);
-        if (new_file.is_open()) {
-            for (const auto& [key, value] : env_vars) {
-                new_file << key << "=" << value << std::endl;
-                setenv(key.c_str(), value.c_str(), 1);
-            }
-            new_file.close();
-            std::cout << ".env file created at " << filename << std::endl;
-        } else {
-            std::cerr << "Failed to create .env file at " << filename << std::endl;
-        }
-        return;
-    }
+    if (!file.is_open()) return;
 
     std::string line;
     while (std::getline(file, line)) {
@@ -955,7 +925,7 @@ std::string SecureServer::create_http_response(int status_code, const std::strin
 }
 
 std::string SecureServer::serve_static_file(const std::string& file_path) {
-    std::string full_path = "static/" + file_path;
+    std::string full_path = std::string(get_server_root_directory()) + "/static/" + file_path;
 
     std::ifstream file(full_path, std::ios::binary);
     if (!file.is_open()) {
@@ -970,7 +940,7 @@ std::string SecureServer::serve_static_file(const std::string& file_path) {
 }
 
 std::string SecureServer::render_template(const std::string& template_name, const std::map<std::string, std::string>& variables) {
-    std::string template_path = "templates/" + template_name;
+    std::string template_path = std::string(get_server_root_directory()) + "/templates/" + template_name;
 
     std::ifstream file(template_path);
     if (!file.is_open()) {
