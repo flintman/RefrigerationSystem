@@ -50,7 +50,6 @@ private:
     // Security
     std::set<std::string> blocked_ips_;
     std::map<std::string, int> failed_attempts_;
-    mutable std::mutex blocked_ips_mutex_;
 
     // Data management
     std::map<std::string, std::vector<nlohmann::json>> unit_data_;

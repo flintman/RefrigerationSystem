@@ -1,2 +1,5 @@
+1.0.1
+    ssl: always require SSL for production caused lockups
+
 1.0.0
     First Release.

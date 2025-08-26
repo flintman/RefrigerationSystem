@@ -35,7 +35,7 @@ $(OBJ_DIR)/%.o: $(SRC_DIR)/%.cpp
 
 DEB_DIR = $(BUILD_DIR)/deb
 DEB_NAME = refrigeration-server
-DEB_VERSION = 1.0.0
+DEB_VERSION = 1.0.1
 DEB_ARCH = $(shell dpkg --print-architecture)
 
 SYSTEMD_DIR = $(DEB_DIR)/lib/systemd/system

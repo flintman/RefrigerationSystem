@@ -115,7 +115,6 @@ void SecureServer::create_data_directory() {
 }
 
 void SecureServer::load_blocked_ips() {
-    std::lock_guard<std::mutex> lock(blocked_ips_mutex_);
     blocked_ips_.clear();
 
     std::string blocked_ips_path = std::string(get_server_root_directory()) + "/" + BLOCKED_IPS_FILE;
@@ -134,15 +133,20 @@ void SecureServer::load_blocked_ips() {
 }
 
 void SecureServer::save_blocked_ips() {
-    std::lock_guard<std::mutex> lock(blocked_ips_mutex_);
     nlohmann::json j = nlohmann::json::array();
     for (const auto& ip : blocked_ips_) {
         j.push_back(ip);
     }
 
     std::string blocked_ips_path = std::string(get_server_root_directory()) + "/" + BLOCKED_IPS_FILE;
+    log("Saving blocked IPs to: " + blocked_ips_path);
     std::ofstream file(blocked_ips_path);
+    if (!file.is_open()) {
+        log("Failed to open blocked IPs file for writing: " + blocked_ips_path);
+        return;
+    }
     file << j.dump(4);
+    file.flush();
 }
 
 void SecureServer::load_data() {
@@ -355,7 +359,6 @@ void SecureServer::start_socket_server() {
 
         // Check if IP is blocked
         {
-            std::lock_guard<std::mutex> lock(blocked_ips_mutex_);
             if (blocked_ips_.find(client_ip) != blocked_ips_.end()) {
                 log("Blocked connection attempt from " + client_ip);
                 close(client_fd);
@@ -375,12 +378,12 @@ void SecureServer::start_socket_server() {
                 // Track failed attempts
                 failed_attempts_[client_ip]++;
                 if (failed_attempts_[client_ip] >= max_attempts_) {
-                    std::lock_guard<std::mutex> lock(blocked_ips_mutex_);
                     blocked_ips_.insert(client_ip);
                     save_blocked_ips();
                     log("IP " + client_ip + " blocked after " + std::to_string(max_attempts_) + " failed attempts");
                 }
 
+                log("SSL handshake failed for " + client_ip + " failed attempt tracked and closed");
                 SSL_free(ssl);
                 close(client_fd);
                 continue;
@@ -396,11 +399,9 @@ void SecureServer::start_socket_server() {
                 close(client_fd);
             }).detach();
         } else {
-            // Handle client without SSL for testing
-            std::thread([this, client_fd, client_ip]() {
-                handle_client_no_ssl(client_fd, client_ip);
-                close(client_fd);
-            }).detach();
+            // Reject non-SSL connections in production
+            log("Rejected non-SSL connection from " + client_ip);
+            close(client_fd);
         }
     }
 
