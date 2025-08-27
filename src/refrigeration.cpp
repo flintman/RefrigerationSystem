@@ -186,7 +186,11 @@ void update_gpio_from_status() {
     gpio.write("fan_pin", status["fan"] == "False");
     gpio.write("compressor_pin", status["compressor"] == "False");
     gpio.write("valve_pin", status["valve"] == "False");
-    gpio.write("electric_heater_pin", status["electric_heater"] == "False");
+    if (unit_has_electric_heater) {
+        gpio.write("electric_heater_pin", status["electric_heater"] == "False");
+    } else {
+        logger.log_events("Debug", "Electric heater not configured, skipping GPIO update for electric_heater_pin");
+    }
     update_compressor_on_time(status["compressor"]);
 }
 

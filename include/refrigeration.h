@@ -68,6 +68,7 @@ inline std::atomic<int> pretrip_stage{0};
 inline std::atomic<time_t> compressor_on_start_time{0};
 inline std::atomic<long> compressor_on_total_seconds{cfg.get("unit.compressor_run_seconds") == "0" ? 0 : std::stol(cfg.get("unit.compressor_run_seconds"))};
 inline std::string last_compressor_status = "False";
+inline std::atomic<bool> unit_has_electric_heater{cfg.get("unit.electric_heat") == "1" ? true : false};
 
 
 // Status map
