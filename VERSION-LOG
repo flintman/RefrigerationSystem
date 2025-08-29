@@ -1,3 +1,11 @@
+1.2.0
+    d0f1bbe timer:  on startup displaying thousands of hours than clears up
+    61aad73 electric_heat:  give the ability to disable if not present.
+    5702ff7 ssl:  write up on how to create the files and what is needed
+    6781e8a client:  update to be more inline with rest of config descriptions
+    87e5e9c secure:  setup ssl certification verification
+    21fcab3 certs:  remove the define out of the code and put in config file
+    19a9822 variables:  remove all seconds and go with mins
 1.1.1
     variables:  remove all seconds from the config file with minutes for simplicity
 1.1.0
