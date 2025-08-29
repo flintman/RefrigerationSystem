@@ -62,7 +62,7 @@ inline std::atomic<time_t> defrost_button_press_start_time{0};
 inline std::atomic<time_t> defrost_last_time{time(nullptr)};
 inline std::atomic<time_t> compressor_last_stop_time{time(nullptr) - 400};
 inline std::atomic<time_t> alarm_reset_button_press_start_time{0};
-inline std::atomic<time_t> state_timer{0};
+inline std::atomic<time_t> state_timer{time(nullptr)};
 inline std::atomic<time_t> pretrip_stage_start = 0;
 inline std::atomic<int> pretrip_stage{0};
 inline std::atomic<time_t> compressor_on_start_time{0};
