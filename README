@@ -17,10 +17,16 @@ All third-party licenses are included in the source distribution.
 The is my software to control a refrigeration system with a raspberry pi.
 
 ####### To Compile #######
+
+-Base System-
 sudo apt-get install libssl-dev build-essential gcc make
 
 make -- to build .deb
 make clean -- to clean build folder
+
+-Server-
+make server -- to build server .deb
+make server-clean -- clean the directory
 
 ####### Server Needs #######
 sudo apt-get install libcurl4-openssl-dev
@@ -120,7 +126,7 @@ SDC : 3
 one-wire : 4
 
 
-######### Required Equipment ###########
+######### Required Equipment WIP until I fully build and test one###########
 
 (1)ATS01N232LU  32Amp SoftStart   https://www.grainger.com/product/SCHNEIDER-ELECTRIC-Soft-Start-200-to-240V-AC-6VME1
 (1)ATS01N222LU  22Amp SoftStart   https://www.grainger.com/product/SCHNEIDER-ELECTRIC-Soft-Start-200-to-240V-AC-6VMD8

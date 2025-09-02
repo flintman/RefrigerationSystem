@@ -102,7 +102,12 @@ deb: $(TARGET)
 
     # Build the .deb
 	dpkg-deb --build $(DEB_DIR) $(BUILD_DIR)/$(DEB_NAME)_$(DEB_VERSION)_$(DEB_ARCH).deb
-	echo ".deb package built: $(BUILD_DIR)/$(DEB_NAME)_$(DEB_VERSION)_$(DEB_ARCH).deb"
+	@echo "--------------------------------------------------------------------------------"
+	@echo "--------------------------------------------------------------------------------"
+	@echo ".deb package built: $(abspath $(BUILD_DIR))/$(DEB_NAME)_$(DEB_VERSION)_$(DEB_ARCH).deb"
+	@echo "--------------------------------------------------------------------------------"
+	@echo "--------------------------------------------------------------------------------"
+
 
 clean:
 	rm -rf $(BUILD_DIR)

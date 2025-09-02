@@ -69,7 +69,7 @@ server:
 	@echo "Server build completed!"
 
 # Clean server
-clean-server:
+server-clean:
 	$(MAKE) -C server clean
 
 # Linking
