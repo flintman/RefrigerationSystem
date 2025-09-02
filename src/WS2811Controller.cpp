@@ -1,21 +1,32 @@
+/*
+ * Refrigeration Server
+ * Copyright (c) 2025 William Bellvance Jr
+ * Licensed under the MIT License.
+ *
+ * This project includes third-party software:
+ * - OpenSSL (Apache License 2.0)
+ * - ws2811 (MIT License)
+ * - nlohmann/json (MIT License)
+ */
+
 #include "WS2811Controller.h"
 #include <stdexcept>
 #include <iostream>
 
-WS2811Controller::WS2811Controller(int ledCount, int gpioPin, uint8_t brightness) 
+WS2811Controller::WS2811Controller(int ledCount, int gpioPin, uint8_t brightness)
     : m_ledCount(ledCount), m_initialized(false) {
-    
+
     // Initialize the LED string configuration
     m_ledString.freq = WS2811_TARGET_FREQ;
     m_ledString.dmanum = 10; // DMA channel (5 or 10 are safe choices)
-    
+
     // Channel 0 configuration
     m_ledString.channel[0].gpionum = gpioPin;
     m_ledString.channel[0].count = ledCount;
     m_ledString.channel[0].invert = 0;
     m_ledString.channel[0].brightness = brightness;
     m_ledString.channel[0].strip_type = WS2811_STRIP_RGB;
-    
+
     // Channel 1 is unused
     m_ledString.channel[1].gpionum = 0;
     m_ledString.channel[1].count = 0;
@@ -44,7 +55,7 @@ void WS2811Controller::setLED(int index, uint8_t red, uint8_t green, uint8_t blu
     if (index < 0 || index >= m_ledCount) {
         throw std::out_of_range("LED index out of range");
     }
-    
+
     m_ledString.channel[0].leds[index] = (green << 16) | (red << 8) | blue;
 }
 

@@ -1,3 +1,14 @@
+/*
+ * Refrigeration Server
+ * Copyright (c) 2025 William Bellvance Jr
+ * Licensed under the MIT License.
+ *
+ * This project includes third-party software:
+ * - OpenSSL (Apache License 2.0)
+ * - ws2811 (MIT License)
+ * - nlohmann/json (MIT License)
+ */
+
 #include "alarm.h"
 #include "refrigeration.h"
 #include <iostream>

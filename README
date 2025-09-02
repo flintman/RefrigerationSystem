@@ -1,5 +1,19 @@
 ## Refrigeration C-PLUS-PLUS
 
+####### License #######
+
+This project is licensed under the MIT License. See the LICENSE file for details.
+
+######### Third-Party Licenses #######
+
+This project includes third-party software:
+
+- **OpenSSL** (Apache License 2.0) — see `vendor/openssl/LICENSE.txt`
+- **ws2811** (MIT License) — see `vendor/ws2811/LICENSE`
+- **nlohmann/json** (MIT License) — see `include/nlohmann/json.hpp`
+
+All third-party licenses are included in the source distribution.
+
 The is my software to control a refrigeration system with a raspberry pi.
 
 ####### To Compile #######
