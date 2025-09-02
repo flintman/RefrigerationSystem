@@ -18,9 +18,9 @@ endif
 # Compiler and flags
 CXX = $(CROSS_PREFIX)g++
 CC = $(CROSS_PREFIX)gcc
-CXXFLAGS = -std=c++17 -Wall -g -Iinclude -I$(ARCH)/include -Ivendor/ws2811 -Ivendor/openssl/include
-CFLAGS = -Wall -g -Iinclude -Ivendor/ws2811 -Ivendor/openssl/include
-LDFLAGS = -L$(ARCH)/lib -Lvendor/openssl/lib -Wl,-rpath=$(ARCH)/lib -Wl,-rpath=vendor/openssl/lib -static-libstdc++ -static-libgcc
+CXXFLAGS = -std=c++17 -Wall -g -Iinclude -I$(ARCH)/include -Ivendor/ws2811 -Ivendor/openssl/compiled/include
+CFLAGS = -Wall -g -Iinclude -Ivendor/ws2811 -Ivendor/openssl/compiled/include
+LDFLAGS = -L$(ARCH)/lib -Lvendor/openssl/compiled/lib -Wl,-rpath=$(ARCH)/lib -Wl,-rpath=vendor/openssl/compiled/lib -static-libstdc++ -static-libgcc
 LDFLAGS += -static -lm
 
 # Directories
