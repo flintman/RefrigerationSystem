@@ -13,6 +13,7 @@ This project includes third-party software:
 - **nlohmann/json** (MIT License) — see `include/nlohmann/json.hpp`
 
 All third-party licenses are included in the source distribution.
+See [THIRD_PARTY_LICENSES](THIRD_PARTY_LICENSES) for details. When redistributing or packaging this software, be sure to include all relevant license files.
 
 The is my software to control a refrigeration system with a raspberry pi.
 

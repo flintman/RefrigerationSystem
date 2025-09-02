@@ -18,8 +18,8 @@ endif
 # Compiler and flags
 CXX = $(CROSS_PREFIX)g++
 CC = $(CROSS_PREFIX)gcc
-CXXFLAGS = -std=c++17 -Wall -g -Iinclude -I$(ARCH)/include -Ivendor/ws2811 -Ivendor/openssl/compiled/include
-CFLAGS = -Wall -g -Iinclude -Ivendor/ws2811 -Ivendor/openssl/compiled/include
+CXXFLAGS = -std=c++17 -Wall -g -Iinclude -I$(ARCH)/include -Ivendor/ws2811 -Ivendor/openssl/compiled/include -Ivendor/nlohmann_json/single_include
+CFLAGS = -Wall -g -Iinclude -Ivendor/ws2811 -Ivendor/openssl/compiled/include -Ivendor/nlohmann_json/single_include
 LDFLAGS = -L$(ARCH)/lib -Lvendor/openssl/compiled/lib -Wl,-rpath=$(ARCH)/lib -Wl,-rpath=vendor/openssl/compiled/lib -static-libstdc++ -static-libgcc
 LDFLAGS += -static -lm
 
@@ -101,6 +101,7 @@ deb: $(TARGET) $(TOOL_TARGET)
 	rm -rf $(DEB_DIR)
 	mkdir -p $(DEB_DIR)/DEBIAN
 	mkdir -p $(DEB_DIR)/usr/bin
+	mkdir -p $(DEB_DIR)/usr/share/doc/$(DEB_NAME)
 	mkdir -p $(DEB_DIR)/etc/systemd/system/
 	mkdir -p $(DEB_DIR)/etc/refrigeration
 
@@ -129,6 +130,14 @@ deb: $(TARGET) $(TOOL_TARGET)
 
 	# Copy service file
 	cp services/$(DEB_NAME).service $(DEB_DIR)/etc/systemd/system/$(DEB_NAME).service
+
+	# Add this to your packaging target (e.g. deb) in makefile
+	# Copy main LICENSE and third-party licenses to package
+	cp LICENSE $(DEB_DIR)/usr/share/doc/$(DEB_NAME)/LICENSE
+	cp THIRD_PARTY_LICENSES $(DEB_DIR)/usr/share/doc/$(DEB_NAME)/THIRD_PARTY_LICENSES
+	cp vendor/openssl/LICENSE.txt $(DEB_DIR)/usr/share/doc/$(DEB_NAME)/openssl_LICENSE
+	cp vendor/ws2811/LICENSE $(DEB_DIR)/usr/share/doc/$(DEB_NAME)/ws2811_LICENSE
+	cp vendor/nlohmann_json/LICENSE.MIT $(DEB_DIR)/usr/share/doc/$(DEB_NAME)/nlohmann_json_LICENSE
 
 	# Copy compiled binaries
 	cp $(TARGET) $(DEB_DIR)/usr/bin/$(DEB_NAME)

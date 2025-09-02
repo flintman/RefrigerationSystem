@@ -3,7 +3,7 @@
 
 # Compiler and flags
 CXX = g++
-CXXFLAGS = -std=c++17 -Wall -g -Iinclude -I../include
+CXXFLAGS = -std=c++17 -Wall -g -Iinclude -I../include -I../vendor/nlohmann_json/single_include
 LDFLAGS = -pthread -lssl -lcrypto -lstdc++fs -lcurl
 
 # Directories
@@ -72,6 +72,15 @@ deb: $(TARGET)
 	@echo "systemctl enable refrigeration-server.service" >> $(DEB_DIR)/DEBIAN/postinst
 	@chmod +x $(DEB_DIR)/DEBIAN/postinst
 	@echo "rm -R /$(DEB_NAME)" >> $(DEB_DIR)/DEBIAN/postinst
+
+	# Add this to your packaging target (e.g. deb) in makefile
+	# Copy main LICENSE and third-party licenses to package
+	@mkdir -p $(DEB_DIR)/usr/share/doc/$(DEB_NAME)
+	@cp ../LICENSE $(DEB_DIR)/usr/share/doc/$(DEB_NAME)/LICENSE
+	@cp ../THIRD_PARTY_LICENSES $(DEB_DIR)/usr/share/doc/$(DEB_NAME)/THIRD_PARTY_LICENSES
+	@cp ../vendor/openssl/LICENSE.txt $(DEB_DIR)/usr/share/doc/$(DEB_NAME)/openssl_LICENSE
+	@cp ../vendor/ws2811/LICENSE $(DEB_DIR)/usr/share/doc/$(DEB_NAME)/ws2811_LICENSE
+	@cp ../vendor/nlohmann_json/LICENSE.MIT $(DEB_DIR)/usr/share/doc/$(DEB_NAME)/nlohmann_json_LICENSE
 
     # Systemd service file
 	@echo "[Unit]" > $(SERVICE_FILE)
