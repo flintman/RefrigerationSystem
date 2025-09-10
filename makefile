@@ -134,7 +134,7 @@ deb: $(TARGET) $(TOOL_TARGET)
 	# Add this to your packaging target (e.g. deb) in makefile
 	# Copy main LICENSE and third-party licenses to package
 	cp LICENSE $(DEB_DIR)/usr/share/doc/$(DEB_NAME)/LICENSE
-	cp THIRD_PARTY_LICENSES $(DEB_DIR)/usr/share/doc/$(DEB_NAME)/THIRD_PARTY_LICENSES
+	cp THIRD_PARTY_LICENSES.md $(DEB_DIR)/usr/share/doc/$(DEB_NAME)/THIRD_PARTY_LICENSES
 	cp vendor/openssl/LICENSE.txt $(DEB_DIR)/usr/share/doc/$(DEB_NAME)/openssl_LICENSE
 	cp vendor/ws2811/LICENSE $(DEB_DIR)/usr/share/doc/$(DEB_NAME)/ws2811_LICENSE
 	cp vendor/nlohmann_json/LICENSE.MIT $(DEB_DIR)/usr/share/doc/$(DEB_NAME)/nlohmann_json_LICENSE
