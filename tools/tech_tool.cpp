@@ -23,6 +23,7 @@
 #include <chrono>
 #include <thread>
 
+
 class ConfigEditor {
 public:
     ConfigEditor(const std::string& filepath) : manager(filepath) {}
@@ -34,7 +35,7 @@ public:
             printTemperatureSensors();
             printMainMenu();
 
-            int choice = getMenuChoice(2); // 1: Edit config, 2: Service menu, 0: Exit
+            int choice = getMenuChoice(3); // 1: Edit config, 2: Service menu, 3: Live sensors, 0: Exit
             if (choice == 0) {
                 break;
             } else if (choice == 1) {
@@ -45,41 +46,52 @@ public:
                 runConfigMenu();
             } else if (choice == 2) {
                 runServiceMenu();
+            } else if (choice == 3) {
+                runLiveTemperatureDisplay();
             }
         }
     }
 
 private:
+    void printHeader(const std::string& title) {
+        std::cout << "\033[1;34m";
+        std::cout << "========================================\n";
+        std::cout << title << "\n";
+        std::cout << "========================================\n";
+        std::cout << "\033[0m";
+    }
+
     ConfigManager manager;
     SensorManager sensors;
 
     void clearScreen() {
-        std::cout << "\033[2J\033[1;1H"; // ANSI escape codes
+        std::cout << "\033[2J\033[H";
     }
 
     void printCurrentConfig() {
-        std::cout << "=== Current Configuration ===\n";
+        printHeader("Current Configuration");
         int index = 1;
         for (const auto& [key, entry] : manager.getSchema()) {
-            std::cout << std::setw(2) << index++ << ". "
+            std::cout << "  \033[1;33m" << std::setw(2) << index++ << ".\033[0m "
                       << std::setw(30) << std::left << key
-                      << " = " << manager.get(key)
+                      << " = \033[1;32m" << manager.get(key) << "\033[0m"
                       << " (default: " << entry.defaultValue << ")\n";
         }
-        std::cout << "\n\n";
+        std::cout << "\n";
     }
 
     void printTemperatureSensors() {
-        std::cout << "=== Temp Sensors ===\n";
+        printHeader("Temperature Sensors");
         sensors.readOneWireTempSensors();
-        std::cout << "\n\n";
+        std::cout << "\n";
     }
 
     void printMainMenu() {
-        std::cout << "=== Main Menu ===\n";
-        std::cout << "1. Edit configuration (requires stopping refrigeration.service)\n";
-        std::cout << "2. Manage refrigeration.service\n";
-        std::cout << "0. Exit\n\n";
+        printHeader("Main Menu");
+        std::cout << "  \033[1;36m1.\033[0m Edit configuration (requires stopping refrigeration.service)\n";
+        std::cout << "  \033[1;36m2.\033[0m Manage refrigeration.service\n";
+        std::cout << "  \033[1;36m3.\033[0m Live temperature sensors\n";
+        std::cout << "  \033[1;31m0.\033[0m Exit\n\n";
         std::cout << "Enter your choice: ";
     }
 
@@ -88,7 +100,7 @@ private:
         while (!(std::cin >> choice) || choice < 0 || choice > maxOption) {
             std::cin.clear();
             std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-            std::cout << "Invalid choice. Please try again: ";
+            std::cout << "\033[1;31mInvalid choice. Please try again:\033[0m ";
         }
         return choice;
     }
@@ -123,27 +135,27 @@ private:
     }
 
     void printConfigMenu() {
-        std::cout << "=== Config Menu ===\n";
-        std::cout << "1-" << manager.getSchema().size() << ". Edit configuration item\n";
-        std::cout << "D. Reset config file to default\n\n";
-        std::cout << "0. Back to Main Menu\n";
+        printHeader("Config Menu");
+        std::cout << "  \033[1;36m1-" << manager.getSchema().size() << ".\033[0m Edit configuration item\n";
+        std::cout << "  \033[1;36mD.\033[0m Reset config file to default\n";
+        std::cout << "  \033[1;31m0.\033[0m Back to Main Menu\n";
         std::cout << "Enter your choice: ";
     }
 
     void resetConfigFileToDefault() {
-        std::cout << "Are you sure you want to reset the configuration file to default values? (y/n): ";
+        std::cout << "\033[1;31mAre you sure you want to reset the configuration file to default values? (y/n): \033[0m";
         char confirm;
         std::cin >> confirm;
         if (confirm == 'y' || confirm == 'Y') {
             manager.resetToDefaults();
         } else {
-            std::cout << "Reset cancelled.\n";
+            std::cout << "\033[1;33mReset cancelled.\033[0m\n";
             std::cout << "Press Enter to continue...";
             std::cin.ignore();
             std::cin.get();
             return;
         }
-        std::cout << "Configuration file has been reset to default values.\n";
+        std::cout << "\033[1;32mConfiguration file has been reset to default values.\033[0m\n";
         std::cout << "Press Enter to continue...";
         std::cin.ignore();
         std::cin.get();
@@ -152,12 +164,12 @@ private:
     void runServiceMenu() {
         while (true) {
             clearScreen();
-            std::cout << "=== refrigeration.service Menu ===\n";
-            std::cout << "1. Start service\n";
-            std::cout << "2. Stop service\n";
-            std::cout << "3. Restart service\n";
-            std::cout << "4. View logs (journalctl -u refrigeration.service -f)\n";
-            std::cout << "0. Back to Main Menu\n";
+            printHeader("refrigeration.service Menu");
+            std::cout << "  \033[1;36m1.\033[0m Start service\n";
+            std::cout << "  \033[1;36m2.\033[0m Stop service\n";
+            std::cout << "  \033[1;36m3.\033[0m Restart service\n";
+            std::cout << "  \033[1;36m4.\033[0m View logs (journalctl -u refrigeration.service -f)\n";
+            std::cout << "  \033[1;31m0.\033[0m Back to Main Menu\n";
             std::cout << "Enter your choice: ";
 
             int choice = getMenuChoice(4);
@@ -166,24 +178,24 @@ private:
             switch (choice) {
                 case 1:
                     system("sudo systemctl start refrigeration.service");
-                    std::cout << "Service started. Press Enter to continue...";
+                    std::cout << "\033[1;32mService started.\033[0m Press Enter to continue...";
                     std::cin.ignore();
                     std::cin.get();
                     break;
                 case 2:
                     system("sudo systemctl stop refrigeration.service");
-                    std::cout << "Service stopped. Press Enter to continue...";
+                    std::cout << "\033[1;33mService stopped.\033[0m Press Enter to continue...";
                     std::cin.ignore();
                     std::cin.get();
                     break;
                 case 3:
                     system("sudo systemctl restart refrigeration.service");
-                    std::cout << "Service restarted. Press Enter to continue...";
+                    std::cout << "\033[1;32mService restarted.\033[0m Press Enter to continue...";
                     std::cin.ignore();
                     std::cin.get();
                     break;
                 case 4:
-                    std::cout << "Press Ctrl+C to exit logs.\n";
+                    std::cout << "\033[1;35mPress Ctrl+C to exit logs.\033[0m\n";
                     system("sudo journalctl -u refrigeration.service -f");
                     break;
             }
@@ -225,8 +237,8 @@ private:
         std::advance(it, index);
         const auto& [key, entry] = *it;
 
-        std::cout << "\nEditing: " << key << "\n";
-        std::cout << "Current value: " << manager.get(key) << "\n";
+        std::cout << "\n\033[1;34mEditing: \033[1;33m" << key << "\033[0m\n";
+        std::cout << "Current value: \033[1;32m" << manager.get(key) << "\033[0m\n";
         std::cout << "Default value: " << entry.defaultValue << "\n";
         std::cout << "Enter new value (or 'd' for default, 'c' to cancel): ";
 
@@ -236,13 +248,13 @@ private:
         if (input == "d") {
             manager.set(key, entry.defaultValue);
             manager.save();
-            std::cout << "Reset to default value.\n";
+            std::cout << "\033[1;32mReset to default value.\033[0m\n";
         } else if (input != "c") {
             if (manager.set(key, input)) {
                 manager.save();
-                std::cout << "Value updated successfully.\n";
+                std::cout << "\033[1;32mValue updated successfully.\033[0m\n";
             } else {
-                std::cout << "Invalid value for this configuration item.\n";
+                std::cout << "\033[1;31mInvalid value for this configuration item.\033[0m\n";
             }
         }
 
@@ -251,6 +263,27 @@ private:
         std::cin.get();
     }
 
+    void runLiveTemperatureDisplay() {
+        while (true) {
+            clearScreen();
+            printHeader("Live Temperature Sensors (updates every 2s)");
+            sensors.readOneWireTempSensors();
+            std::cout << "\nPress 'q' then Enter to return to main menu.\n";
+            // Non-blocking check for 'q' input
+            fd_set set;
+            struct timeval timeout;
+            FD_ZERO(&set);
+            FD_SET(0, &set);
+            timeout.tv_sec = 2;
+            timeout.tv_usec = 0;
+            int rv = select(1, &set, NULL, NULL, &timeout);
+            if (rv > 0) {
+                std::string input;
+                std::getline(std::cin, input);
+                if (!input.empty() && (input[0] == 'q' || input[0] == 'Q')) break;
+            }
+        }
+    }
 };
 
 int main(int argc, char* argv[]) {
