@@ -7,7 +7,7 @@ This directory contains the C++ implementation of the refrigeration system serve
 - **SSL/TLS Socket Server** (port 5001) - Secure communication with refrigeration units
 - **HTTP Web Server** (port 5008) - Web interface for monitoring and control
 - **Data Persistence** - JSON file storage in `received_data/` directory
-- **Email Notifications** - Simulated SMTP for alarm notifications (logs messages)
+- **Email Notifications** - Sends SMTP for alarm notifications (logs messages) --If setup
 - **Command Queuing** - Send commands (defrost, alarm_reset) to units
 - **CSV Export** - Download unit data as CSV files
 - **IP Blocking** - Security against failed authentication attempts
@@ -87,34 +87,6 @@ Example data structure:
   "status": "Cooling",
   "alarm_codes": [101, 205]
 }
-```
-
-## Differences from Python Version
-
-1. **Email**: Uses simulated SMTP (logs instead of sending emails)
-2. **CSV Export**: Generates CSV directly instead of Excel files
-3. **Templating**: Simple variable substitution instead of Jinja2
-4. **Session Management**: Basic implementation included but not fully utilized
-5. **No Dependencies**: Self-contained C++ implementation
-
-## Testing
-
-The server includes test data files for development. Start the server and test endpoints:
-
-```bash
-# Test API
-curl http://localhost:5008/api/units
-
-# Test unit data
-curl http://localhost:5008/unit/Unit001
-
-# Test CSV download
-curl http://localhost:5008/download/Unit001
-
-# Test command
-curl -X POST -H "Content-Type: application/json" \
-     -d '{"command":"defrost"}' \
-     http://localhost:5008/command/Unit001
 ```
 
 ## Socket Communication
