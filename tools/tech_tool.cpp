@@ -168,11 +168,12 @@ private:
             std::cout << "  \033[1;36m1.\033[0m Start service\n";
             std::cout << "  \033[1;36m2.\033[0m Stop service\n";
             std::cout << "  \033[1;36m3.\033[0m Restart service\n";
-            std::cout << "  \033[1;36m4.\033[0m View logs (journalctl -u refrigeration.service -f)\n";
+            std::cout << "  \033[1;36m4.\033[0m View status (systemctl status refrigeration.service)\n";
+            std::cout << "  \033[1;36m5.\033[0m View logs (journalctl -u refrigeration.service -f)\n";
             std::cout << "  \033[1;31m0.\033[0m Back to Main Menu\n";
             std::cout << "Enter your choice: ";
 
-            int choice = getMenuChoice(4);
+            int choice = getMenuChoice(5);
             if (choice == 0) break;
 
             switch (choice) {
@@ -195,6 +196,12 @@ private:
                     std::cin.get();
                     break;
                 case 4:
+                    system("sudo systemctl status refrigeration.service");
+                    std::cout << "\033[1;32mService status displayed.\033[0m Press Enter to continue...";
+                    std::cin.ignore();
+                    std::cin.get();
+                    break;
+                case 5:
                     std::cout << "\033[1;35mPress Ctrl+C to exit logs.\033[0m\n";
                     system("sudo journalctl -u refrigeration.service -f");
                     break;
