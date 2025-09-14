@@ -20,7 +20,7 @@ The is my software to control a refrigeration system with a raspberry pi.
 ####### To Compile #######
 
 -Base System-
-sudo apt-get install libssl-dev build-essential gcc make
+sudo apt-get install libssl-dev build-essential gcc make g++-arm-linux-gnueabihf
 
 make -- to build .deb
 make clean -- to clean build folder
