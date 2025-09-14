@@ -119,7 +119,6 @@ deb: $(TARGET) $(TOOL_TARGET)
 	echo "systemctl daemon-reexec" >> $(DEB_DIR)/DEBIAN/postinst
 	echo "systemctl daemon-reload" >> $(DEB_DIR)/DEBIAN/postinst
 	echo "systemctl enable $(DEB_NAME).service" >> $(DEB_DIR)/DEBIAN/postinst
-	echo "systemctl start $(DEB_NAME).service" >> $(DEB_DIR)/DEBIAN/postinst
 	chmod +x $(DEB_DIR)/DEBIAN/postinst
 
 	# Pre-removal script
