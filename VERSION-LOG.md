@@ -1,5 +1,13 @@
 # Version Log
 
+## 1.3.0
+- **d364e4e**: log:  clean up duplicated work.
+- **bfd3a4f**: tech-tool:  add in the ability to look at the service.
+- **5e58dc0**: tech-tool:  clean up to be easier to read.
+- **9e9c17a**: MIT License.
+- **bd539c0**: openssl:  bring on the source to keep in the vendor folder.
+- **eb1aa7e**: refrigeration:  don't start on install.
+
 ## 1.2.0
 - **d0f1bbe**: Timer – On startup, displaying thousands of hours, then clears up.
 - **61aad73**: Electric Heat – Ability to disable if not present.
