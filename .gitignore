@@ -1,4 +1,1 @@
 build/
-server/received_data/
-server/blocked_ips.json
-server/.env
