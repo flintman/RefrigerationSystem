@@ -77,7 +77,7 @@ deb: $(TARGET)
 	# Copy main LICENSE and third-party licenses to package
 	@mkdir -p $(DEB_DIR)/usr/share/doc/$(DEB_NAME)
 	@cp ../LICENSE $(DEB_DIR)/usr/share/doc/$(DEB_NAME)/LICENSE
-	@cp ../THIRD_PARTY_LICENSES $(DEB_DIR)/usr/share/doc/$(DEB_NAME)/THIRD_PARTY_LICENSES
+	@cp ../THIRD_PARTY_LICENSES.md $(DEB_DIR)/usr/share/doc/$(DEB_NAME)/THIRD_PARTY_LICENSES
 	@cp ../vendor/openssl/LICENSE.txt $(DEB_DIR)/usr/share/doc/$(DEB_NAME)/openssl_LICENSE
 	@cp ../vendor/ws2811/LICENSE $(DEB_DIR)/usr/share/doc/$(DEB_NAME)/ws2811_LICENSE
 	@cp ../vendor/nlohmann_json/LICENSE.MIT $(DEB_DIR)/usr/share/doc/$(DEB_NAME)/nlohmann_json_LICENSE
@@ -117,8 +117,10 @@ deb: $(TARGET)
 	@echo "--------------------------------------------------------------------------------"
 	@echo "--------------------------------------------------------------------------------"
 
+	@cp $(BUILD_DIR)/$(DEB_NAME)_$(DEB_VERSION)_$(DEB_ARCH).deb ../
 
 clean:
 	rm -rf $(BUILD_DIR)
+	rm -f ../$(DEB_NAME)_$(DEB_VERSION)_$(DEB_ARCH).deb
 
 .PHONY: all clean deb

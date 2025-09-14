@@ -147,8 +147,11 @@ deb: $(TARGET) $(TOOL_TARGET)
 	@echo "--------------------------------------------------------------------------------"
 	@echo ".deb package built: $(BUILD_DIR)/$(DEB_NAME)_$(DEB_VERSION)_$(DEB_ARCH).deb"
 
+	@cp $(BUILD_DIR)/$(DEB_NAME)_$(DEB_VERSION)_$(DEB_ARCH).deb ./
+
 # Clean up
 clean:
 	rm -rf $(BUILD_DIR)
+	rm -f ./$(DEB_NAME)_$(DEB_VERSION)_$(DEB_ARCH).deb
 
 .PHONY: all clean server clean-server
