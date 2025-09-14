@@ -81,24 +81,17 @@ void Logger::log_conditions(float setpoint, float return_sensor, float coil_sens
         std::ofstream log_file(log_file_path, std::ios::app);
 
         if (log_file.is_open()) {
-            log_file << get_current_datetime() << " - "
-                     << "Setpoint: " << setpoint << ", Return Sensor: " << return_sensor << ", "
-                     << "Coil Sensor: " << coil_sensor << ", Supply: " << supply_sensor << ", "
-                     << "Status: " << systems_status.at("status") << ", "
-                     << "Compressor: " << systems_status.at("compressor") << ", "
-                     << "Fan: " << systems_status.at("fan") << ", "
-                     << "Valve: " << systems_status.at("valve") << ", "
-                     << "Electric_heater: " << (systems_status.count("electric_heater") ? systems_status.at("electric_heater") : "N/A")
-                     << "\n";
-            std::cout << "(" << get_current_datetime() << ") " << "Log_condition: "
-                     << "Setpoint: " << setpoint << ", Return Sensor: " << return_sensor << ", "
-                     << "Coil Sensor: " << coil_sensor << ", Supply: " << supply_sensor << ", "
-                     << "Status: " << systems_status.at("status") << ", "
-                     << "Compressor: " << systems_status.at("compressor") << ", "
-                     << "Fan: " << systems_status.at("fan") << ", "
-                     << "Valve: " << systems_status.at("valve") << ", "
-                     << "Electric_heater: " << (systems_status.count("electric_heater") ? systems_status.at("electric_heater") : "N/A")
-                     <<  std::endl;
+            std::string log_line = get_current_datetime() + " - "
+                     + "Setpoint: " + std::to_string(setpoint) + ", Return Sensor: " + std::to_string(return_sensor) + ", "
+                     + "Coil Sensor: " + std::to_string(coil_sensor) + ", Supply: " + std::to_string(supply_sensor) + ", "
+                     + "Status: " + systems_status.at("status") + ", "
+                     + "Compressor: " + systems_status.at("compressor") + ", "
+                     + "Fan: " + systems_status.at("fan") + ", "
+                     + "Valve: " + systems_status.at("valve") + ", "
+                     + "Electric_heater: " + (systems_status.count("electric_heater") ? systems_status.at("electric_heater") : "N/A")
+                     + "\n";
+            log_file << log_line;
+            std::cout << log_line;
         }
     } catch (const std::exception& e) {
         std::cerr << "Error logging conditions: " << e.what() << std::endl;
@@ -114,8 +107,9 @@ void Logger::log_events(const std::string& event_type, const std::string& event_
 
             if (log_file.is_open()) {
                 std::string timestamp = get_current_datetime();
-                log_file << "[" << timestamp << "] " << event_type << "] " << event_message << "\n";
-                std::cout << "(" << timestamp << ") " << event_type << ": " << event_message << std::endl;
+                std::string log_line = "[" + timestamp + "] " + event_type + "] " + event_message + "\n";
+                log_file << log_line;
+                std::cout << log_line;
             }
         }
     } catch (const std::exception& e) {
