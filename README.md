@@ -1,152 +1,209 @@
-## Refrigeration C-PLUS-PLUS
+# Refrigeration C++
 
-####### License #######
+## License
 
-This project is licensed under the MIT License. See the LICENSE file for details.
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
 
-######### Third-Party Licenses #######
+## Third-Party Licenses
 
 This project includes third-party software:
 
-- **OpenSSL** (Apache License 2.0) — see `vendor/openssl/LICENSE.txt`
-- **ws2811** (MIT License) — see `vendor/ws2811/LICENSE`
-- **nlohmann/json** (MIT License) — see `include/nlohmann/json.hpp`
+- **OpenSSL** (Apache License 2.0) — see [`vendor/openssl/LICENSE.txt`](vendor/openssl/LICENSE.txt)
+- **ws2811** (MIT License) — see [`vendor/ws2811/LICENSE`](vendor/ws2811/LICENSE)
+- **nlohmann/json** (MIT License) — see [`include/nlohmann/json.hpp`](include/nlohmann/json.hpp)
 
-All third-party licenses are included in the source distribution.
-See [THIRD_PARTY_LICENSES](THIRD_PARTY_LICENSES.md) for details. When redistributing or packaging this software, be sure to include all relevant license files.
+All third-party licenses are included in the source distribution.  
+See [THIRD_PARTY_LICENSES](THIRD_PARTY_LICENSES.md) for details.  
+When redistributing or packaging this software, be sure to include all relevant license files.
 
-The is my software to control a refrigeration system with a raspberry pi.
+---
 
-####### To Compile #######
+This is my software to control a refrigeration system with a Raspberry Pi.
 
--Base System-
+---
+
+## Compilation
+
+### Base System
+
+```sh
 sudo apt-get install libssl-dev build-essential gcc make g++-arm-linux-gnueabihf
+make            # Build .deb
+make clean      # Clean build folder
+```
 
-make -- to build .deb
-make clean -- to clean build folder
+### Server
 
--Server-
-make server -- to build server .deb
-make server-clean -- clean the directory
+```sh
+make server         # Build server .deb
+make server-clean   # Clean the directory
+```
 
-####### Server Needs #######
+## Server Dependencies
+
+```sh
 sudo apt-get install libcurl4-openssl-dev
+```
 
-####### To Install #######
-1. sudo raspi-config
-    a. Enable 1-Wire, 12C, and SPI and reboot
-2. install the .deb file.
-3. sudo tech-tool to setup the device.
+---
 
-#######  On Start Up #######
-On Startup the system will broadcast a hotspot to be able to connect to it.  This will last for 2 minutes unless you connect to the hotspot and then the hotspot will last
-as long as you are connected.
+## Installation
 
-#######  Force Start Hotspot #######
-Set the setpoint to 65F and press and hold the alarm button for 10+ seconds.  The ip address will display on the inside screen to connect. save as above its active for 2 minutes unless you stay connected.
+1. `sudo raspi-config`
+    - Enable 1-Wire, I2C, and SPI, then reboot.
+2. Install the `.deb` file.
+3. Run `sudo tech-tool` to set up the device.
 
-#######  Alarm codes #######
-    Shutdown Alarms
-        1001 - Unit not cooling - looking for at least 5F across the coil over 30 minute  AND  Return Temp is over 30F
-        1002 - Unit not heating - looking for at least 5F degrees across the coil in 30 minutes AND Retrun Temp is under 60F
-        1004 - Unit Defrost timed out - Ran longer than 45 minutes in Defrost.
+---
 
-        2000 - Return Sensor Failure - Outside of the range
-        2001 - Coil Sensor Failure - Outside of the range
+## Startup Behavior
 
-        9001 - Pretrip Cooling issue
-        9002 - Pretrip Heating issue
-        9003 - Pretrip Cooling issue # 2
+On startup, the system will broadcast a hotspot for 2 minutes (or as long as you remain connected).
 
-    Warning Alarms
-        2002 - Supply Sensor Failure - Outside of the range
+### Force Start Hotspot
 
-        9000 - Pretrip Passed
+Set the setpoint to **65°F** and press and hold the alarm button for 10+ seconds.  
+The IP address will display on the inside screen. The hotspot remains active for 2 minutes unless you stay connected.
 
-####### Setpoint #######
-There is two options for the setpoint,  either a 10ohm resister rotary switch tied into channel 3 and unit.setpoint_rotary set to 1.  Or you can have buttons if unit.setpoint_rotary = 0 and buttons wired to 3.3 -> channel 1 and 2.  Press and hold either button for 2 seconds and the display will flash with setpoint = XX.  press up and down to get to the setpoint.  Holding a button for more than 5 seconds it will skip by 5.  Press both buttons to save and exit setpoint mode.  If you are in setpoint mode and don't do anything than if exits and keeps the original setpoint on exit if not saved.
+---
 
-####### Demo Mode #######
-Set the setpoint to 80F and press and hold the defrost button for 10 sec.  This will toggle it in and out of Demo Mode.  This will simulate cooling, heating, defrost, etc to test the equipment and see how it works.
+## Alarm Codes
 
-####### PRETRIP Mode #######
-Set the setpoint to 65F and press and hold the defrost button for 10 sec.  This will start pretrip mode.  This will simulate cooling, heating, and back to cooling before either alarming out or passing.
+<details>
+<summary><strong>Shutdown Alarms</strong></summary>
 
-####### Generate keys #######
+- **1001** - Unit not cooling (≥5°F across coil in 30 min & Return Temp > 30°F)
+- **1002** - Unit not heating (≥5°F across coil in 30 min & Return Temp < 60°F)
+- **1004** - Unit defrost timed out (defrost > 45 min)
+- **2000** - Return sensor failure (out of range)
+- **2001** - Coil sensor failure (out of range)
+- **9001** - Pretrip cooling issue
+- **9002** - Pretrip heating issue
+- **9003** - Pretrip cooling issue #2
 
-- Common key
-    openssl genrsa -out ca.key 4096
+</details>
 
-    openssl req -x509 -new -key ca.key -sha256 -days 3650 -out ca.pem \
-      -subj "/C=US/O=Refrigeration/OU=Root CA/CN=Refrigeration Root CA" \
-      -addext "basicConstraints=critical,CA:true" \
-      -addext "keyUsage=critical, keyCertSign, cRLSign"
+<details>
+<summary><strong>Warning Alarms</strong></summary>
 
-- Server key
-    openssl genrsa -out server.key 2048
+- **2002** - Supply sensor failure (out of range)
+- **9000** - Pretrip passed
 
-    openssl req -new -key server.key -out server.csr \
-       -subj "/C=US/O=Refrigeration/OU=Server/CN=Refrigeration Server"
+</details>
 
-    openssl x509 -req -in server.csr -CA ca.pem -CAkey ca.key -CAcreateserial \
-      -out server.crt -days 825 -sha256 Certificate request self-signature ok \
-    subject=C = US, O = Refrigeration, OU = Server, CN = Refrigeration Server
+---
 
-- Client Key
-    openssl genrsa -out client.key 2048
+## Setpoint Options
 
-    openssl req -new -key client.key -out client.csr \
-      -subj "/C=US/O=Refrigeration/OU=Client/CN=Refrigeration Client"
+- **Rotary Switch:** 10Ω resistor rotary switch on channel 3 (`unit.setpoint_rotary = 1`)
+- **Buttons:** If `unit.setpoint_rotary = 0`, use buttons on channels 1 & 2 (3.3V).  
+  - Press/hold either button for 2s: display flashes setpoint.
+  - Use up/down to adjust. Hold >5s to skip by 5.
+  - Press both buttons to save and exit.
+  - Inactivity exits without saving.
 
-    openssl x509 -req -in client.csr -CA ca.pem -CAkey ca.key -CAcreateserial \
-      -out client.crt -days 825 -sha256 Certificate request self-signature ok \
-    subject=C = US, O = Refrigeration, OU = Client, CN = Refrigeration Client
+---
 
-This will generate ca.key  ca.pem  ca.srl  client.crt  client.csr  client.key  server.crt  server.csr  server.key
+## Demo Mode
 
--Server files needed
-    CERT_FILE=/path/to/server.crt
-    KEY_FILE=/path/to/server.key
-    CA_CERT_FILE=/path/to/ca.pem
+Set setpoint to **80°F** and hold the defrost button for 10s.  
+Toggles Demo Mode (simulates cooling, heating, defrost, etc.).
 
--Client files needed
-    client.ca=/path/to/ca.pem
-    client.cert=/path/to/client.crt
-    client.key=/path/to/client.key
+---
 
-####### GPIO Pins used  #########
-Compressor Output : 17
-Fan output : 27
-3-way valve output : 22
-Electric Heat output : 23
-Alarm Button : 5
-Defrost Button : 25
-LED Lights : 18
-SDA : 2
-SDC : 3
-one-wire : 4
+## Pretrip Mode
 
+Set setpoint to **65°F** and hold the defrost button for 10s.  
+Starts Pretrip Mode (simulates cooling, heating, and returns to cooling before pass/fail).
 
-######### Required Equipment WIP until I fully build and test one###########
+---
 
-(1)ATS01N232LU  32Amp SoftStart   https://www.grainger.com/product/SCHNEIDER-ELECTRIC-Soft-Start-200-to-240V-AC-6VME1
-(1)ATS01N222LU  22Amp SoftStart   https://www.grainger.com/product/SCHNEIDER-ELECTRIC-Soft-Start-200-to-240V-AC-6VMD8
-(1)18Z758       Din Rail          https://www.grainger.com/product/Mounting-Track-DIN-Rail-Mounting-18Z758
-(1)             4 relay block     https://www.amazon.com/Electronics-Salon-Signal-Interface-Module-Version/dp/B00M7VX0CK/
-(1)             wiring            https://www.amazon.com/Conductor-Electrical-Stranded-Oxygen-Free-Automotive/dp/B0CNXGSXC2/
-(1)             24V Transformer   https://www.amazon.com/Transformer%EF%BC%8C-Secondary-Isolation-Transformers%EF%BC%8C24V-Transformer/dp/B0B8Z2XV7V/
-(1)             24V Pilot Sol
-(1)             32 amp breaker    https://www.amazon.com/KERWINN-Miniature-Magnetic-Disconnect-50A/dp/B0CN66C18J
-(1)             16 amp breaker    https://www.amazon.com/KERWINN-Miniature-Magnetic-Disconnect-50A/dp/B0CN65TYZH/
+## Generating Keys
 
+### Common Key
 
-(1)            Raspberry Pi       https://www.amazon.com/Raspberry-Quad-core-Bluetooth-onboard-Antenna/dp/B0CCRP85TR/
-(1)            Headers            https://www.amazon.com/Frienda-Break-Away-Connector-Compatible-Raspberry/dp/B083DYVWDN
-(1)            DS18B20 sensors    https://www.amazon.com/AILEWEI-DS18B20-Temperature-Stainless-Waterproof/dp/B0DK3HP3TV/
-(1)            Enclosure          https://www.amazon.com/Gratury-Stainless-Waterproof-Electrical-290%C3%97190%C3%97140mm/dp/B08282SQPT/
-(1)            17 pin connector   https://www.amazon.com/HangTon-Aviation-Circular-Connector-Automotive/dp/B0BN3ZD6DB/
-(1)            20 conductor       https://www.amazon.com/KWANGIL-20AWG-Conductor-Cable-UL2464/dp/B0CSCYYS2T/
-(1)            Weather connector
-(1)            ADS1115            https://www.amazon.com/Teyleten-Robot-Converter-Amplifier-Raspberry/dp/B0CNV9G4K1/
-(1)            TCA9548A           https://www.amazon.com/gp/product/B0BTH8GCSC/
-(1)            Weather Box Back   https://www.amazon.com/dp/B0CXN42RP3/
+```sh
+openssl genrsa -out ca.key 4096
+
+openssl req -x509 -new -key ca.key -sha256 -days 3650 -out ca.pem \
+  -subj "/C=US/O=Refrigeration/OU=Root CA/CN=Refrigeration Root CA" \
+  -addext "basicConstraints=critical,CA:true" \
+  -addext "keyUsage=critical, keyCertSign, cRLSign"
+```
+
+### Server Key
+
+```sh
+openssl genrsa -out server.key 2048
+
+openssl req -new -key server.key -out server.csr \
+  -subj "/C=US/O=Refrigeration/OU=Server/CN=Refrigeration Server"
+
+openssl x509 -req -in server.csr -CA ca.pem -CAkey ca.key -CAcreateserial \
+  -out server.crt -days 825 -sha256
+```
+
+### Client Key
+
+```sh
+openssl genrsa -out client.key 2048
+
+openssl req -new -key client.key -out client.csr \
+  -subj "/C=US/O=Refrigeration/OU=Client/CN=Refrigeration Client"
+
+openssl x509 -req -in client.csr -CA ca.pem -CAkey ca.key -CAcreateserial \
+  -out client.crt -days 825 -sha256
+```
+
+This will generate:  
+`ca.key`, `ca.pem`, `ca.srl`, `client.crt`, `client.csr`, `client.key`, `server.crt`, `server.csr`, `server.key`
+
+#### Server Files Needed
+
+```sh
+CERT_FILE=/path/to/server.crt
+KEY_FILE=/path/to/server.key
+CA_CERT_FILE=/path/to/ca.pem
+```
+
+#### Client Files Needed
+
+```sh
+client.ca=/path/to/ca.pem
+client.cert=/path/to/client.crt
+client.key=/path/to/client.key
+```
+
+---
+
+## GPIO Pins Used
+
+| Function                | GPIO Pin |
+|-------------------------|----------|
+| Compressor Output       | 17       |
+| Fan Output              | 27       |
+| 3-way Valve Output      | 22       |
+| Electric Heat Output    | 23       |
+| Alarm Button            | 5        |
+| Defrost Button          | 25       |
+| LED Lights              | 18       |
+| SDA                     | 2        |
+| SCL                     | 3        |
+| One-Wire                | 4        |
+
+---
+
+## Required Equipment *(WIP until fully built and tested)*
+
+- (1) [Raspberry Pi](https://www.amazon.com/Raspberry-Quad-core-Bluetooth-onboard-Antenna/dp/B0CCRP85TR/)
+- (1) [Headers](https://www.amazon.com/Frienda-Break-Away-Connector-Compatible-Raspberry/dp/B083DYVWDN)
+- (1) [DS18B20 sensors](https://www.amazon.com/AILEWEI-DS18B20-Temperature-Stainless-Waterproof/dp/B0DK3HP3TV/)
+- (1) [Enclosure](https://www.amazon.com/Gratury-Stainless-Waterproof-Electrical-290%C3%97190%C3%97140mm/dp/B08282SQPT/)
+- (1) [17 pin connector](https://www.amazon.com/HangTon-Aviation-Circular-Connector-Automotive/dp/B0BN3ZD6DB/)
+- (1) [20 conductor cable](https://www.amazon.com/KWANGIL-20AWG-Conductor-Cable-UL2464/dp/B0CSCYYS2T/)
+- (1) Weather connector
+- (1) [ADS1115](https://www.amazon.com/Teyleten-Robot-Converter-Amplifier-Raspberry/dp/B0CNV9G4K1/)
+- (1) [TCA9548A](https://www.amazon.com/gp/product/B0BTH8GCSC/)
+- (1) [Weather Box Back](https://www.amazon.com/dp/B0CXN42RP3/)
+
+---
