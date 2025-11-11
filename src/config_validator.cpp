@@ -20,6 +20,7 @@ ConfigValidator::ConfigValidator() {
         {"unit.compressor_run_seconds", {"0", ConfigType::Integer}},
         {"unit.electric_heat",       {"1", ConfigType::Boolean}},
         {"unit.fan_continuous",       {"0", ConfigType::Boolean}},
+        {"unit.relay_active_low",       {"1", ConfigType::Boolean}},
         {"unit.setpoint_rotary",       {"1", ConfigType::Boolean}},
         {"unit.setpoint",              {"55", ConfigType::Integer}},
         {"debug.code",                 {"1", ConfigType::Boolean}},

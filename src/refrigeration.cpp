@@ -108,10 +108,19 @@ void update_sensor_thread() {
 
         std::this_thread::sleep_for(milliseconds(1000));
     }
-    gpio.write("fan_pin", true);
-    gpio.write("compressor_pin", true);
-    gpio.write("valve_pin", true);
-    gpio.write("electric_heater_pin", true);
+    if(cfg.get("unit.relay_active_low") == "0") {
+        // Set all outputs to OFF for normally closed relays
+        gpio.write("fan_pin", false);
+        gpio.write("compressor_pin", false);
+        gpio.write("valve_pin", false);
+        gpio.write("electric_heater_pin", false);
+    } else {
+        // Set all outputs to ON for normally open relays
+        gpio.write("fan_pin", true);
+        gpio.write("compressor_pin", true);
+        gpio.write("valve_pin", true);
+        gpio.write("electric_heater_pin", true);
+    }
     std::this_thread::sleep_for(milliseconds(100)); // Give time for GPIO to settle
     logger.log_events("Debug", "Sensor thread stopped");
 }
@@ -194,11 +203,12 @@ void update_gpio_from_status() {
     if(cfg.get("unit.fan_continuous") == "1" && status["status"] != "Alarm" && status["status"] != "Defrost") {
         status["fan"] = "True"; // Force fan to be ON in continuous mode
     }
-    gpio.write("fan_pin", status["fan"] == "False");
-    gpio.write("compressor_pin", status["compressor"] == "False");
-    gpio.write("valve_pin", status["valve"] == "False");
+    bool relayNO = (cfg.get("unit.relay_active_low") != "0");
+    gpio.write("fan_pin", relayNO ? (status["fan"] == "False") : (status["fan"] == "True"));
+    gpio.write("compressor_pin", relayNO ? (status["compressor"] == "False") : (status["compressor"] == "True"));
+    gpio.write("valve_pin", relayNO ? (status["valve"] == "False") : (status["valve"] == "True"));
     if (unit_has_electric_heater) {
-        gpio.write("electric_heater_pin", status["electric_heater"] == "False");
+        gpio.write("electric_heater_pin", relayNO ? (status["electric_heater"] == "False") : (status["electric_heater"] == "True"));
     } else {
         logger.log_events("Debug", "Electric heater not configured, skipping GPIO update for electric_heater_pin");
     }

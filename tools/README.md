@@ -24,6 +24,7 @@ Below are the available configuration options for `tech_tool`:
 | `unit.compressor_run_seconds`| Compressor runtime in seconds. Default: `0`.                                  |
 | `unit.electric_heat`         | Enable (`1`) or disable (`0`) electric heat.                                  |
 | `unit.fan_continuous`        | Enable (`1`) or disable (`0`) continuous fan operation.                       |
+| `unit.relay_active_low`       | Low (`1`) or High (`0`) relay trigger.                     |
 | `unit.setpoint_rotary`       | Enable (`1`) or disable (`0`) rotary setpoint adjustment.                     |
 | `unit.setpoint`              | Temperature setpoint for the unit. Default: `55`.                             |
 | `debug.code`                 | Enable (`1`) or disable (`0`) debug mode.                                     |
