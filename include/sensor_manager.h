@@ -19,7 +19,7 @@ class SensorManager {
 public:
     SensorManager();
 
-    void readOneWireTempSensors();
+    std::vector<std::string> readOneWireTempSensors();
     float celsiusToFahrenheit(float celsius);
     float readSensor(const std::string& sensor_id);
 

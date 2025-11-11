@@ -1,3 +1,5 @@
+
+
 /*
  * Refrigeration Server
  * Copyright (c) 2025 William Bellvance Jr
@@ -10,36 +12,74 @@
  */
 
 #include "config_manager.h"
-#include "config_validator.h"
 #include "sensor_manager.h"
 #include <iostream>
 #include <iomanip>
-#include <termios.h>
-#include <unistd.h>
+#include <string>
+#include <vector>
+#include <mutex>
+#include <thread>
+#include <atomic>
+#include <limits>
 #include <csignal>
 #include <cstdio>
 #include <cstdlib>
 #include <sys/wait.h>
 #include <chrono>
-#include <thread>
 
 
 class ConfigEditor {
 public:
-    ConfigEditor(const std::string& filepath) : manager(filepath) {}
+    ConfigEditor(const std::string& filepath)
+        : manager(filepath), pollingActive(false) {}
+
+    void printHeader(const std::string& title) {
+        std::cout << "\033[1;34m";
+        std::cout << "========================================\n";
+        std::cout << title << "\n";
+        std::cout << "========================================\n";
+        std::cout << "\033[0m";
+    }
+
+    void startSensorPolling() {
+        pollingActive = true;
+        pollingThread = std::thread([this]() {
+            while (pollingActive) {
+                auto lines = sensors.readOneWireTempSensors();
+                {
+                    std::lock_guard<std::mutex> lock(sensorMutex);
+                    latestSensorLines = std::move(lines);
+                }
+                if (!polling1stfetch) {
+                    polling1stfetch = true;
+                }
+                std::this_thread::sleep_for(std::chrono::seconds(2));
+            }
+        });
+    }
+
+    void stopSensorPolling() {
+        pollingActive = false;
+        polling1stfetch = false;
+        if (pollingThread.joinable()) pollingThread.join();
+    }
 
     void run() {
+        startSensorPolling();
+        // Wait until the first sensor poll is complete
+        std::cout << "1st pull on Polling sensors...\n";
+        while (!polling1stfetch) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        }
         while (true) {
             clearScreen();
             printCurrentConfig();
             printTemperatureSensors();
             printMainMenu();
-
-            int choice = getMenuChoice(3); // 1: Edit config, 2: Service menu, 3: Live sensors, 0: Exit
+            int choice = getMenuChoice(3);
             if (choice == 0) {
                 break;
             } else if (choice == 1) {
-                // Stop service before editing config
                 if (killRefrigerationProcess()) {
                     std::cout << "Waiting for ./refrigeration to close...\n";
                 }
@@ -50,24 +90,12 @@ public:
                 runLiveTemperatureDisplay();
             }
         }
+        stopSensorPolling();
     }
-
-private:
-    void printHeader(const std::string& title) {
-        std::cout << "\033[1;34m";
-        std::cout << "========================================\n";
-        std::cout << title << "\n";
-        std::cout << "========================================\n";
-        std::cout << "\033[0m";
-    }
-
-    ConfigManager manager;
-    SensorManager sensors;
 
     void clearScreen() {
         std::cout << "\033[2J\033[H";
     }
-
     void printCurrentConfig() {
         printHeader("Current Configuration");
         int index = 1;
@@ -79,13 +107,18 @@ private:
         }
         std::cout << "\n";
     }
-
     void printTemperatureSensors() {
         printHeader("Temperature Sensors");
-        sensors.readOneWireTempSensors();
+        std::vector<std::string> lines;
+        {
+            std::lock_guard<std::mutex> lock(sensorMutex);
+            lines = latestSensorLines;
+        }
+        for (const auto& line : lines) {
+            std::cout << line << '\n';
+        }
         std::cout << "\n";
     }
-
     void printMainMenu() {
         printHeader("Main Menu");
         std::cout << "  \033[1;36m1.\033[0m Edit configuration (requires stopping refrigeration.service)\n";
@@ -94,7 +127,6 @@ private:
         std::cout << "  \033[1;31m0.\033[0m Exit\n\n";
         std::cout << "Enter your choice: ";
     }
-
     int getMenuChoice(int maxOption) {
         int choice;
         while (!(std::cin >> choice) || choice < 0 || choice > maxOption) {
@@ -104,7 +136,6 @@ private:
         }
         return choice;
     }
-
     void runConfigMenu() {
         while (true) {
             clearScreen();
@@ -113,16 +144,13 @@ private:
             printConfigMenu();
             std::string choiceStr;
             std::cin >> choiceStr;
-
             if (choiceStr == "0") {
                 break;
             }
-
             if (choiceStr == "D" || choiceStr == "d") {
                 resetConfigFileToDefault();
                 continue;
             }
-
             try {
                 int choice = std::stoi(choiceStr);
                 if (choice > 0 && choice <= static_cast<int>(manager.getSchema().size())) {
@@ -133,7 +161,6 @@ private:
             }
         }
     }
-
     void printConfigMenu() {
         printHeader("Config Menu");
         std::cout << "  \033[1;36m1-" << manager.getSchema().size() << ".\033[0m Edit configuration item\n";
@@ -141,7 +168,6 @@ private:
         std::cout << "  \033[1;31m0.\033[0m Back to Main Menu\n";
         std::cout << "Enter your choice: ";
     }
-
     void resetConfigFileToDefault() {
         std::cout << "\033[1;31mAre you sure you want to reset the configuration file to default values? (y/n): \033[0m";
         char confirm;
@@ -160,7 +186,6 @@ private:
         std::cin.ignore();
         std::cin.get();
     }
-
     void runServiceMenu() {
         while (true) {
             clearScreen();
@@ -172,10 +197,8 @@ private:
             std::cout << "  \033[1;36m5.\033[0m View logs (journalctl -u refrigeration.service -f)\n";
             std::cout << "  \033[1;31m0.\033[0m Back to Main Menu\n";
             std::cout << "Enter your choice: ";
-
             int choice = getMenuChoice(5);
             if (choice == 0) break;
-
             switch (choice) {
                 case 1:
                     system("sudo systemctl start refrigeration.service");
@@ -208,11 +231,9 @@ private:
             }
         }
     }
-
     int killRefrigerationProcess() {
         // Stop the systemd service first
         system("sudo systemctl stop refrigeration.service");
-
         FILE* pipe = popen("pgrep -x refrigeration", "r");
         if (!pipe) return 0;
         char buffer[128];
@@ -225,7 +246,6 @@ private:
             }
         }
         pclose(pipe);
-
         // Wait for process to exit
         if (killed) {
             while (true) {
@@ -238,20 +258,16 @@ private:
         }
         return killed ? 1 : 0;
     }
-
     void editConfigItem(int index) {
         auto it = manager.getSchema().begin();
         std::advance(it, index);
         const auto& [key, entry] = *it;
-
         std::cout << "\n\033[1;34mEditing: \033[1;33m" << key << "\033[0m\n";
         std::cout << "Current value: \033[1;32m" << manager.get(key) << "\033[0m\n";
         std::cout << "Default value: " << entry.defaultValue << "\n";
         std::cout << "Enter new value (or 'd' for default, 'c' to cancel): ";
-
         std::string input;
         std::cin >> input;
-
         if (input == "d") {
             manager.set(key, entry.defaultValue);
             manager.save();
@@ -264,17 +280,22 @@ private:
                 std::cout << "\033[1;31mInvalid value for this configuration item.\033[0m\n";
             }
         }
-
         std::cout << "Press Enter to continue...";
         std::cin.ignore();
         std::cin.get();
     }
-
     void runLiveTemperatureDisplay() {
         while (true) {
             clearScreen();
             printHeader("Live Temperature Sensors (updates every 2s)");
-            sensors.readOneWireTempSensors();
+            std::vector<std::string> lines;
+            {
+                std::lock_guard<std::mutex> lock(sensorMutex);
+                lines = latestSensorLines;
+            }
+            for (const auto& line : lines) {
+                std::cout << line << '\n';
+            }
             std::cout << "\nPress 'q' then Enter to return to main menu.\n";
             // Non-blocking check for 'q' input
             fd_set set;
@@ -291,7 +312,17 @@ private:
             }
         }
     }
+private:
+    ConfigManager manager;
+    SensorManager sensors;
+    std::vector<std::string> latestSensorLines;
+    std::mutex sensorMutex;
+    std::thread pollingThread;
+    std::atomic<bool> pollingActive;
+    std::atomic<bool> polling1stfetch{false};
+
 };
+
 
 int main(int argc, char* argv[]) {
     if (geteuid() != 0) {
