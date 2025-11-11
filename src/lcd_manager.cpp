@@ -133,11 +133,11 @@ void LCD2004_SMBus::write4bits(uint8_t value)
     uint8_t data[1];
     data[0] = value | LCD_ENABLE | (backlightState ? LCD_BACKLIGHT : 0);
     smbusWriteBlock(0, data, 1);
-    usleep(.5);
+    usleep(.1);
 
     data[0] = (value & ~LCD_ENABLE) | (backlightState ? LCD_BACKLIGHT : 0);
     smbusWriteBlock(0, data, 1);
-    usleep(.5);
+    usleep(.1);
 }
 
 void LCD2004_SMBus::send(uint8_t value, uint8_t mode)
@@ -146,16 +146,16 @@ void LCD2004_SMBus::send(uint8_t value, uint8_t mode)
     uint8_t lownib = (value << 4) & 0xF0;
 
     write4bits(highnib | mode);
-    usleep(.5);
+    usleep(.1);
     write4bits(lownib | mode);
-    usleep(.5);
+    usleep(.1);
 }
 
 void LCD2004_SMBus::clear()
 {
     mux->selectChannel(channel);
     send(0x01, LCD_CMD);
-    usleep(.5);
+    usleep(.1);
 
     // Reset line buffers
     for (auto &line : currentLines)
