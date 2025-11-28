@@ -58,34 +58,15 @@ void SMBusDevice::smbusWriteBlock(uint8_t reg, const uint8_t *data, uint8_t leng
     delete[] buffer;
 }
 
-// TCA9548A implementation
-TCA9548A_SMBus::TCA9548A_SMBus(const char *bus, uint8_t address)
-    : SMBusDevice(bus, address) {}
-
-void TCA9548A_SMBus::selectChannel(uint8_t channel)
-{
-    if (channel > 7)
-        throw std::out_of_range("Channel must be 0-7");
-    smbusWriteByte(0, 1 << channel);
-    usleep(1);
-}
-
-void TCA9548A_SMBus::disableAllChannels()
-{
-    smbusWriteByte(0, 0x00);
-}
 
 // LCD2004 implementation
-LCD2004_SMBus::LCD2004_SMBus(std::shared_ptr<TCA9548A_SMBus> multiplexer,
-                             uint8_t ch,
-                             uint8_t address)
-    : SMBusDevice("/dev/i2c-1", address), mux(multiplexer), channel(ch), backlightState(true)
+LCD2004_SMBus::LCD2004_SMBus(uint8_t address)
+    : SMBusDevice("/dev/i2c-1", address), backlightState(true)
 {
 }
 
 void LCD2004_SMBus::initiate()
 {
-    mux->selectChannel(channel);
     usleep(5000);
 
     // Initialize LCD in 4-bit mode
@@ -118,7 +99,6 @@ LCD2004_SMBus::~LCD2004_SMBus()
 {
     try
     {
-        mux->selectChannel(channel);
         clear();
         backlight(false);
     }
@@ -153,7 +133,6 @@ void LCD2004_SMBus::send(uint8_t value, uint8_t mode)
 
 void LCD2004_SMBus::clear()
 {
-    mux->selectChannel(channel);
     send(0x01, LCD_CMD);
     usleep(.1);
 
@@ -185,8 +164,6 @@ void LCD2004_SMBus::display(const std::string &text, uint8_t line)
     for (; i < 20; i++)
         newLine[i] = ' ';
 
-    mux->selectChannel(channel);
-
     for (size_t col = 0; col < 20; col++)
     {
         if (currentLines[line][col] != newLine[col])
@@ -201,7 +178,6 @@ void LCD2004_SMBus::display(const std::string &text, uint8_t line)
 void LCD2004_SMBus::backlight(bool on)
 {
     backlightState = on;
-    mux->selectChannel(channel);
     uint8_t data[1] = {on ? LCD_BACKLIGHT : 0x00};
     smbusWriteBlock(0, data, 1);
 }

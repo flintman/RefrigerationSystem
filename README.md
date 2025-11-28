@@ -12,8 +12,8 @@ This project includes third-party software:
 - **ws2811** (MIT License) — see [`vendor/ws2811/LICENSE`](vendor/ws2811/LICENSE)
 - **nlohmann/json** (MIT License) — see [`include/nlohmann/json.hpp`](include/nlohmann/json.hpp)
 
-All third-party licenses are included in the source distribution.  
-See [THIRD_PARTY_LICENSES](THIRD_PARTY_LICENSES.md) for details.  
+All third-party licenses are included in the source distribution.
+See [THIRD_PARTY_LICENSES](THIRD_PARTY_LICENSES.md) for details.
 When redistributing or packaging this software, be sure to include all relevant license files.
 
 ---
@@ -62,7 +62,7 @@ On startup, the system will broadcast a hotspot for 2 minutes (or as long as you
 
 ### Force Start Hotspot
 
-Set the setpoint to **65°F** and press and hold the alarm button for 10+ seconds.  
+Set the setpoint to **65°F** and press and hold the alarm button for 10+ seconds.
 The IP address will display on the inside screen. The hotspot remains active for 2 minutes unless you stay connected.
 
 ---
@@ -96,7 +96,7 @@ The IP address will display on the inside screen. The hotspot remains active for
 ## Setpoint Options
 
 - **Rotary Switch:** 10Ω resistor rotary switch on channel 3 (`unit.setpoint_rotary = 1`)
-- **Buttons:** If `unit.setpoint_rotary = 0`, use buttons on channels 1 & 2 (3.3V).  
+- **Buttons:** If `unit.setpoint_rotary = 0`, use buttons on channels 1 & 2 (3.3V).
   - Press/hold either button for 2s: display flashes setpoint.
   - Use up/down to adjust. Hold >5s to skip by 5.
   - Press both buttons to save and exit.
@@ -106,14 +106,14 @@ The IP address will display on the inside screen. The hotspot remains active for
 
 ## Demo Mode
 
-Set setpoint to **80°F** and hold the defrost button for 10s.  
+Set setpoint to **80°F** and hold the defrost button for 10s.
 Toggles Demo Mode (simulates cooling, heating, defrost, etc.).
 
 ---
 
 ## Pretrip Mode
 
-Set setpoint to **65°F** and hold the defrost button for 10s.  
+Set setpoint to **65°F** and hold the defrost button for 10s.
 Starts Pretrip Mode (simulates cooling, heating, and returns to cooling before pass/fail).
 
 ---
@@ -155,7 +155,7 @@ openssl x509 -req -in client.csr -CA ca.pem -CAkey ca.key -CAcreateserial \
   -out client.crt -days 825 -sha256
 ```
 
-This will generate:  
+This will generate:
 `ca.key`, `ca.pem`, `ca.srl`, `client.crt`, `client.csr`, `client.key`, `server.crt`, `server.csr`, `server.key`
 
 #### Server Files Needed
@@ -203,7 +203,6 @@ client.key=/path/to/client.key
 - (1) [20 conductor cable](https://www.amazon.com/KWANGIL-20AWG-Conductor-Cable-UL2464/dp/B0CSCYYS2T/)
 - (1) Weather connector
 - (1) [ADS1115](https://www.amazon.com/Teyleten-Robot-Converter-Amplifier-Raspberry/dp/B0CNV9G4K1/)
-- (1) [TCA9548A](https://www.amazon.com/gp/product/B0BTH8GCSC/)
 - (1) [Weather Box Back](https://www.amazon.com/dp/B0CXN42RP3/)
 
 ---

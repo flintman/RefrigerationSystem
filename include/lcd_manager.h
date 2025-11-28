@@ -2,13 +2,11 @@
 #define LCD_SMBUS_H
 
 #include <string>
-#include <memory>
 #include <linux/i2c-dev.h>
 #include <sys/ioctl.h>
 #include <fcntl.h>
 #include <array>
 #include <mutex>
-#include <memory>
 #include <unistd.h>
 
 class SMBusDevice {
@@ -24,19 +22,10 @@ public:
     virtual ~SMBusDevice();
 };
 
-class TCA9548A_SMBus : public SMBusDevice {
-public:
-    TCA9548A_SMBus(const char* bus = "/dev/i2c-1", uint8_t address = 0x70);
-    void selectChannel(uint8_t channel);
-    void disableAllChannels();
-};
-
 class LCD2004_SMBus : public SMBusDevice {
 private:
-    std::shared_ptr<TCA9548A_SMBus> mux;
     std::array<std::array<char, 20>, 4> currentLines;
     std::mutex lcdMutex;
-    uint8_t channel;
     bool backlightState;
 
     // LCD constants
@@ -49,9 +38,7 @@ private:
     void send(uint8_t value, uint8_t mode);
 
 public:
-    LCD2004_SMBus(std::shared_ptr<TCA9548A_SMBus> multiplexer,
-                 uint8_t channel,
-                 uint8_t address = 0x27);
+    LCD2004_SMBus(uint8_t address = 0x27);
     ~LCD2004_SMBus();
 
     void clear();
