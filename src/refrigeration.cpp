@@ -405,65 +405,21 @@ void display_system_thread() {
     logger.log_events("Debug", "Display system thread stopped");
 }
 
-void setpoint_system_rotary(float voltage, float max_voltage, float min_voltage, float min_setpoint, float max_setpoint) {
-    logger.log_events("Debug", "Running Rotary!");
-    while (running) {
-        if(pretrip_enable) {
-            if(pretrip_stage == 1) setpoint = 32.0f;
-            else if(pretrip_stage == 2) setpoint = 80.0f;
-            else if(pretrip_stage == 3) setpoint = 32.0f;
-            std::this_thread::sleep_for(std::chrono::milliseconds(200));
-        } else {
-            try {
-                voltage = adc.readVoltage(3);
-            } catch (const std::exception& e) {
-                logger.log_events("Error", std::string("ADS1115 error: ") + e.what());
-            }
-            if (!std::isfinite(voltage)) {
-                logger.log_events("Error", "Invalid voltage reading!");
-                continue;
-            }
-            if (max_voltage == min_voltage) {
-                logger.log_events("Error", "max_voltage and min_voltage are equal! Skipping setpoint calculation.");
-                continue;
-            }
-
-            float m = (max_setpoint - min_setpoint) / (max_voltage - min_voltage);
-            if (!std::isfinite(m)) {
-                logger.log_events("Error", "m is not finite!");
-                continue;
-            }
-            float b = min_setpoint - (m * min_voltage);
-            if (!std::isfinite(b)) {
-                logger.log_events("Error", "b is not finite!");
-                continue;
-            }
-            float setpoint_ = m * voltage + b;
-
-            setpoint = std::clamp(setpoint_, min_setpoint, max_setpoint);
-            setpoint = std::round(setpoint * 1.0f) / 1.0f;
-            std::this_thread::sleep_for(std::chrono::milliseconds(200));
-        }
-    }
-}
-
 void setpoint_system_buttons(float min_setpoint, float max_setpoint) {
 
     // Setpoint button mode logic
     static float setpointStart = setpoint.load();
     static time_t setpointModeStart = 0;
     static time_t setpointPressedDuration = 0;
+    static time_t button_press_start = 0;
     logger.log_events("Debug", "Running Buttons!");
+
     while (running) {
-        float ch1 = adc.readVoltage(1);
-        float ch2 = adc.readVoltage(2);
+        bool up_pressed = gpio.read("up_button_pin");
+        bool down_pressed = gpio.read("down_button_pin");
 
-        // Assume pressed if voltage > 2.5V (adjust threshold as needed)
-        bool ch1_pressed = ch1 > 2.5f;
-        bool ch2_pressed = ch2 > 2.5f;
-
-        static time_t button_press_start = 0;
-        if (!setpointMode && (ch1_pressed || ch2_pressed)) {
+        // Only enter setpoint mode if BOTH buttons are pressed for 2 seconds
+        if (!setpointMode && (up_pressed || down_pressed)) {
             if (button_press_start == 0) {
                 button_press_start = time(nullptr);
             }
@@ -487,15 +443,15 @@ void setpoint_system_buttons(float min_setpoint, float max_setpoint) {
                 step = 5.0f;
             }
 
-            if (ch1_pressed && !ch2_pressed) {
+            if (up_pressed && !down_pressed) {
                 // Up
                 setpoint = std::min(current_setpoint + step, max_setpoint);
                 setpointModeStart = time(nullptr); // Reset timer on press
-            } else if (ch2_pressed && !ch1_pressed) {
+            } else if (down_pressed && !up_pressed) {
                 // Down
                 setpoint = std::max(current_setpoint - step, min_setpoint);
                 setpointModeStart = time(nullptr); // Reset timer on press
-            } else if (ch1_pressed && ch2_pressed) {
+            } else if (up_pressed && down_pressed) {
                 // Save and exit setpoint mode
                 cfg.set("unit.setpoint", std::to_string(static_cast<int>(setpoint.load())));
                 cfg.save();
@@ -516,8 +472,6 @@ void setpoint_system_buttons(float min_setpoint, float max_setpoint) {
 }
 
 void setpoint_system_thread() {
-    constexpr float min_voltage = 0.00f;
-    constexpr float max_voltage = 3.28f;
     float min_setpoint = -20.0f;
     float max_setpoint = 80.0f;
 
@@ -531,12 +485,7 @@ void setpoint_system_thread() {
     } catch (...) {
         max_setpoint = 80.0f;
     }
-    float voltage = 0.0f;
-    if (cfg.get("unit.setpoint_rotary") == "1"){
-        setpoint_system_rotary(voltage, max_voltage, min_voltage, min_setpoint, max_setpoint);
-    } else {
-        setpoint_system_buttons(min_setpoint, max_setpoint);
-    }
+    setpoint_system_buttons(min_setpoint, max_setpoint);
 }
 
 void ws8211_system_thread() {

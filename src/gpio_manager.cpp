@@ -66,7 +66,10 @@ GpioManager::GpioManager() {
     // Define inputs
     inputPins = {
         {"alarm_pin", 5},
-        {"defrost_pin", 25}
+        {"defrost_pin", 6},
+        {"up_button_pin", 25},
+        {"down_button_pin", 16}
+
     };
 
     for (const auto& [name, pin] : outputPins)

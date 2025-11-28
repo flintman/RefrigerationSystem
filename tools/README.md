@@ -25,7 +25,6 @@ Below are the available configuration options for `tech_tool`:
 | `unit.electric_heat`         | Enable (`1`) or disable (`0`) electric heat.                                  |
 | `unit.fan_continuous`        | Enable (`1`) or disable (`0`) continuous fan operation.                       |
 | `unit.relay_active_low`       | Low (`1`) or High (`0`) relay trigger.                     |
-| `unit.setpoint_rotary`       | Enable (`1`) or disable (`0`) rotary setpoint adjustment.                     |
 | `unit.setpoint`              | Temperature setpoint for the unit. Default: `55`.                             |
 | `debug.code`                 | Enable (`1`) or disable (`0`) debug mode.                                     |
 | `defrost.interval_hours`     | Interval in hours between defrost cycles. Default: `8`.                       |

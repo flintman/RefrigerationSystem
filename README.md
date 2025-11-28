@@ -95,8 +95,7 @@ The IP address will display on the inside screen. The hotspot remains active for
 
 ## Setpoint Options
 
-- **Rotary Switch:** 10Ω resistor rotary switch on channel 3 (`unit.setpoint_rotary = 1`)
-- **Buttons:** If `unit.setpoint_rotary = 0`, use buttons on channels 1 & 2 (3.3V).
+- **Buttons:**
   - Press/hold either button for 2s: display flashes setpoint.
   - Use up/down to adjust. Hold >5s to skip by 5.
   - Press both buttons to save and exit.
