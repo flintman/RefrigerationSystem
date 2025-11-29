@@ -184,7 +184,9 @@ client.key=/path/to/client.key
 | 3-way Valve Output      | 22       |
 | Electric Heat Output    | 23       |
 | Alarm Button            | 5        |
-| Defrost Button          | 25       |
+| Defrost Button          | 6        |
+| Up Button               | 25       |
+| Down Button             | 16       |
 | LED Lights              | 18       |
 | SDA                     | 2        |
 | SCL                     | 3        |
@@ -200,8 +202,13 @@ client.key=/path/to/client.key
 - (1) [Enclosure](https://www.amazon.com/Gratury-Stainless-Waterproof-Electrical-290%C3%97190%C3%97140mm/dp/B08282SQPT/)
 - (1) [17 pin connector](https://www.amazon.com/HangTon-Aviation-Circular-Connector-Automotive/dp/B0BN3ZD6DB/)
 - (1) [20 conductor cable](https://www.amazon.com/KWANGIL-20AWG-Conductor-Cable-UL2464/dp/B0CSCYYS2T/)
-- (1) Weather connector
-- (1) [ADS1115](https://www.amazon.com/Teyleten-Robot-Converter-Amplifier-Raspberry/dp/B0CNV9G4K1/)
 - (1) [Weather Box Back](https://www.amazon.com/dp/B0CXN42RP3/)
+- (1) [Relay Din mount](https://a.co/d/2NhFrUK/)
+- (1) [Buttons All](https://a.co/d/aYhVLR0/)
+- (1) [I2C 2004 LCD](https://a.co/d/07W0r4k/)
+- (1) [Step Down Transformer 24V-5V](https://a.co/d/fM00xY2/)
+- (1) [Addressable LED's](https://a.co/d/dIQ0SDA/)
+- (1) [ON/OFF switch](https://a.co/d/05Gg2LM/)
+- (1) (Optional) [ADS1115](https://www.amazon.com/Teyleten-Robot-Converter-Amplifier-Raspberry/dp/B0CNV9G4K1/)
 
 ---
