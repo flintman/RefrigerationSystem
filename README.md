@@ -24,13 +24,28 @@ This is my software to control a refrigeration system with a Raspberry Pi.
 
 ## Compilation
 
+
 ### Base System
 
 ```sh
-sudo apt-get install libssl-dev build-essential gcc make g++-arm-linux-gnueabihf
+sudo apt-get install libssl-dev build-essential gcc make g++-aarch64-linux-gnu
+# 1. Build OpenSSL vendor libraries (required before any build):
+make openssl
+# 2. Build the project:
 make            # Build .deb
-make clean      # Clean build folder
+make clean      # Clean build folder (does NOT clean OpenSSL)
 ```
+
+**Note:**
+- You must run `make openssl` once before any build, or after changing/copying OpenSSL sources.
+- OpenSSL is NOT rebuilt or cleaned automatically on every build. To refresh or fully rebuild OpenSSL, use:
+
+```sh
+make openssl-clean   # Only use this to force a full OpenSSL rebuild
+make openssl         # Rebuild OpenSSL after cleaning
+```
+
+This avoids unnecessary rebuilds of OpenSSL, which rarely changes.
 
 ### Server
 

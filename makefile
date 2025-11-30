@@ -6,8 +6,8 @@ ARCH ?= native
 ifeq ($(ARCH),native)
 UNAME_M := $(shell uname -m)
 ifeq ($(UNAME_M),x86_64)
-ARCH := arm-linux-gnueabihf
-CROSS_PREFIX := arm-linux-gnueabihf-
+ARCH := aarch64-linux-gnu
+CROSS_PREFIX := aarch64-linux-gnu-
 endif
 ifeq ($(UNAME_M),aarch64)
 ARCH :=
@@ -20,13 +20,18 @@ CXX = $(CROSS_PREFIX)g++
 CC = $(CROSS_PREFIX)gcc
 CXXFLAGS = -std=c++17 -Wall -g -Iinclude -I$(ARCH)/include -Ivendor/ws2811 -Ivendor/openssl/compiled/include -Ivendor/nlohmann_json/single_include
 CFLAGS = -Wall -g -Iinclude -Ivendor/ws2811 -Ivendor/openssl/compiled/include -Ivendor/nlohmann_json/single_include
-LDFLAGS = -L$(ARCH)/lib -Lvendor/openssl/compiled/lib -Wl,-rpath=$(ARCH)/lib -Wl,-rpath=vendor/openssl/compiled/lib -static-libstdc++ -static-libgcc
-LDFLAGS += -static -lm
+LDFLAGS = -L$(ARCH)/lib -Lvendor/openssl/compiled/lib \
+		   -Wl,-rpath=$(ARCH)/lib -Wl,-rpath=vendor/openssl/compiled/lib \
+		   -static-libstdc++ -static-libgcc -static -lm
+# Link in OpenSSL (libssl + libcrypto) and other system libs after object files
+LDLIBS = -lssl -lcrypto -ldl -pthread
 
 # Directories
 SRC_DIR = src
 INC_DIR = include
 VENDOR_DIR = vendor/ws2811
+OPENSSL_DIR = vendor/openssl
+OPENSSL_PREFIX = $(OPENSSL_DIR)/compiled
 BUILD_DIR = build
 TOOLS_DIR = tools
 OBJ_DIR = $(BUILD_DIR)/obj
@@ -35,7 +40,7 @@ DEB_DIR = $(BUILD_DIR)/deb
 DEB_NAME = refrigeration
  # Make sure to update the version # in refrigeration.h
 DEB_VERSION = 2.0.0
-DEB_ARCH = armhf
+DEB_ARCH = arm64
 
 # Executable name
 TARGET = $(BIN_DIR)/refrigeration
@@ -75,14 +80,15 @@ server-clean:
 # Linking
 $(TARGET): $(OBJS) $(VENDOR_OBJS)
 	@mkdir -p $(BIN_DIR)
-	$(CXX) $(LDFLAGS) -o $@ $^ -lssl -lcrypto
+	$(CXX) -o $@ $^ $(LDFLAGS) $(LDLIBS)
+
 
 $(TOOL_TARGET): $(ALL_OBJS)
 	@mkdir -p $(BIN_DIR)
-	$(CXX) $(LDFLAGS) -o $@ $^
+	$(CXX) -o $@ $^ $(LDFLAGS) $(LDLIBS)
 
 # Compiling C++ files
-$(OBJ_DIR)/%.o: $(SRC_DIR)/%.cpp
+$(OBJ_DIR)/%.o: $(SRC_DIR)/%.cpp openssl
 	@mkdir -p $(@D)
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
@@ -149,9 +155,28 @@ deb: $(TARGET) $(TOOL_TARGET)
 
 	@cp $(BUILD_DIR)/$(DEB_NAME)_$(DEB_VERSION)_$(DEB_ARCH).deb ./
 
+openssl:
+	@echo "Building OpenSSL into $(OPENSSL_PREFIX) for target $(ARCH)"
+	@mkdir -p $(OPENSSL_DIR)
+	@if [ -d "$(OPENSSL_PREFIX)" ]; then \
+               echo "OpenSSL already built at $(OPENSSL_PREFIX) - remove it with 'make clean' to rebuild"; \
+       else \
+               cd $(OPENSSL_DIR) && rm -rf compiled && \
+               CC=$(CROSS_PREFIX)gcc perl Configure linux-aarch64 no-shared --prefix=$$(pwd)/compiled && \
+               make -j$$(nproc) && \
+               make install_sw; \
+       fi
+
 # Clean up
 clean:
 	rm -rf $(BUILD_DIR)
 	rm -f ./$(DEB_NAME)_$(DEB_VERSION)_$(DEB_ARCH).deb
 
-.PHONY: all clean server clean-server
+
+clean-all: clean server-clean
+	rm -rf $(OPENSSL_PREFIX)
+	@if [ -d "$(OPENSSL_DIR)" ]; then \
+		$(MAKE) -C $(OPENSSL_DIR) clean || true; \
+	fi
+
+.PHONY: all clean server server-clean openssl clean-all deb
