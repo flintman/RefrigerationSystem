@@ -1,5 +1,13 @@
 # Version Log
-
+## 2.0.0
+- **6bff81e**: schematic – Add in the schematic.
+- **943b647**: setpoint – Drop the use of the rotary button.
+- **f81f9cc**: TCA9548A – Drop the need of this.
+- **867137a**: lcd – Drop some delay down.
+- **98ccd92**: techtool – Update the way we poll sensor data.
+- **c7135bc**: relay – Give the option to use high and low trigger relays.
+- **62e067d**: alarm – Shorten up alarm loop.
+- **d05c6aa**: tech-tool – Add a readme.
 ## 1.3.0
 - **d364e4e**: log:  clean up duplicated work.
 - **bfd3a4f**: tech-tool:  add in the ability to look at the service.
