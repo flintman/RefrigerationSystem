@@ -60,6 +60,16 @@ TOOL_OBJS := $(patsubst $(TOOLS_DIR)/%.cpp, $(OBJ_DIR)/%.o, $(TOOL_SRCS))
 
 ALL_OBJS = $(TOOL_OBJS) $(OBJ_DIR)/config_manager.o $(OBJ_DIR)/config_validator.o $(OBJ_DIR)/sensor_manager.o
 
+# =============================
+# FTXUI (Raspberry Pi / aarch64)
+# =============================
+
+FTXUI_DIR        := vendor/FTXUI
+FTXUI_LIB    := $(FTXUI_DIR)/build
+FTXUI_INC    := -I$(FTXUI_DIR)/include
+FTXUI_LIBS   := -L$(FTXUI_LIB) -lftxui-component -lftxui-dom -lftxui-screen
+TOOLCHAIN_FILE   := $(abspath aarch64-toolchain.cmake)
+
 # Default target
 all: deb
 	@echo "--------------------------------------------------------------------------------"
@@ -68,7 +78,7 @@ all: deb
 	@echo "Build completed successfully!"
 
 # Server target
-server:
+server: openssl
 	@echo "Building C++ server..."
 	$(MAKE) -C server
 	@echo "Server build completed!"
@@ -85,17 +95,19 @@ $(TARGET): $(OBJS) $(VENDOR_OBJS)
 
 $(TOOL_TARGET): $(ALL_OBJS)
 	@mkdir -p $(BIN_DIR)
-	$(CXX) -o $@ $^ $(LDFLAGS) $(LDLIBS)
+	$(CXX) -o $@ $^ $(LDFLAGS) $(FTXUI_LIBS) $(LDLIBS)
+
 
 # Compiling C++ files
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.cpp openssl
 	@mkdir -p $(@D)
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
+
 # Compiling tool C++ files
-$(OBJ_DIR)/%.o: $(TOOLS_DIR)/%.cpp
+$(OBJ_DIR)/%.o: $(TOOLS_DIR)/%.cpp  ftxui_build
 	@mkdir -p $(@D)
-	$(CXX) $(CXXFLAGS) -c $< -o $@
+	$(CXX) $(CXXFLAGS) -Ivendor/FTXUI/include -c $< -o $@
 
 # Compiling vendor C files
 $(OBJ_DIR)/vendor/%.o: $(VENDOR_DIR)/%.c
@@ -159,13 +171,18 @@ openssl:
 	@echo "Building OpenSSL into $(OPENSSL_PREFIX) for target $(ARCH)"
 	@mkdir -p $(OPENSSL_DIR)
 	@if [ -d "$(OPENSSL_PREFIX)" ]; then \
-               echo "OpenSSL already built at $(OPENSSL_PREFIX) - remove it with 'make clean' to rebuild"; \
-       else \
-               cd $(OPENSSL_DIR) && rm -rf compiled && \
-               CC=$(CROSS_PREFIX)gcc perl Configure linux-aarch64 no-shared --prefix=$$(pwd)/compiled && \
-               make -j$$(nproc) && \
-               make install_sw; \
-       fi
+		echo "OpenSSL already built at $(OPENSSL_PREFIX) - remove it with 'make clean' to rebuild"; \
+	else \
+		cd $(OPENSSL_DIR) && rm -rf compiled && \
+		CC=$(CROSS_PREFIX)gcc perl Configure linux-aarch64 no-shared --prefix=$$(pwd)/compiled && \
+		make -j$$(nproc) && \
+		make install_sw; \
+	fi
+
+ftxui_build:
+	@echo "[FTXUI] Building for Raspberry Pi (aarch64)..."
+	cmake -S $(FTXUI_DIR) -B $(FTXUI_LIB) -DCMAKE_TOOLCHAIN_FILE=$(TOOLCHAIN_FILE)
+	cmake --build $(FTXUI_LIB)
 
 # Clean up
 clean:
@@ -174,9 +191,11 @@ clean:
 
 
 clean-all: clean server-clean
+	rm -rf $(FTXUI_LIB)
 	rm -rf $(OPENSSL_PREFIX)
 	@if [ -d "$(OPENSSL_DIR)" ]; then \
 		$(MAKE) -C $(OPENSSL_DIR) clean || true; \
 	fi
 
-.PHONY: all clean server server-clean openssl clean-all deb
+.PHONY: all clean server server-clean openssl clean-all deb ftxui_build
+
