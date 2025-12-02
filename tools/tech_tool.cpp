@@ -454,27 +454,26 @@ int main(int argc, char* argv[]) {
                 return true;
             }
             // Capital E toggles back to view mode
-            if (event == Event::Character('E')) {
+            if (event == Event::Character('E') || event == Event::Escape || event == Event::Character('q')) {
                 mode = Mode::View;
                 editing_line = false;
                 edit_value.clear();
                 status_message = "Returned to VIEW MODE.";
                 return true;
             }
-            // Esc or q exits edit mode
-            if (event == Event::Escape || event == Event::Character('q')) {
-                mode = Mode::View;
-                editing_line = false;
-                edit_value.clear();
-                status_message = "Exited EDIT MODE.";
-                return true;
-            }
             return false;
         } else {
             // VIEW MODE: allow entering edit mode with capital E
             if (event == Event::Character('E')) {
-                mode = Mode::Edit;
-                status_message = "Entered EDIT MODE. Press E/q/Esc to exit.";
+                status_message = "Stopping refrigeration service... Please wait.";
+                // Spawn thread to kill process while UI refreshes
+                std::thread kill_thread([&]() {
+                    KillRefrigerationProcess();
+                    std::this_thread::sleep_for(std::chrono::milliseconds(500));
+                    mode = Mode::Edit;
+                    status_message = "Refrigeration service stopped. Entered EDIT MODE. Press E/q/Esc to exit.";
+                });
+                kill_thread.detach();
                 return true;
             }
             // VIEW MODE: allow quitting with 'q'
