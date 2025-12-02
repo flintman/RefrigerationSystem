@@ -1,4 +1,10 @@
 # Version Log
+## 2.1.0
+- **05d1130f**: readme – Update with new way of building, simpler.
+- **be96a08f**: FTXUI – Add in and compile for PI.
+- **39add567**: Move to 64 bit and compile openssl.
+- **307d54bc**: fixup! BUMP 2.0.0.
+- **475e85db**: README – Forgot to update README with the new GPIOs.
 ## 2.0.0
 - **6bff81e**: schematic – Add in the schematic.
 - **943b647**: setpoint – Drop the use of the rotary button.
