@@ -149,6 +149,7 @@ int main(int argc, char* argv[]) {
     ConfigManager config(argv[1]);
     auto schema = config.getSchema();
     int selected = 0;
+    int config_scroll = 0;  // Scroll offset for config table
     std::string edit_value;
     enum class Mode { View, Edit };
     Mode mode = Mode::View;
@@ -156,14 +157,32 @@ int main(int argc, char* argv[]) {
     bool confirm_revert = false;
     Component config_table = Renderer([&] {
         std::vector<Element> rows;
-        int idx = 0;
         std::vector<std::string> keys;
         for (const auto& [key, _] : schema) keys.push_back(key);
+
+        const int config_height = 20;  // Visible height
+        int total_configs = keys.size();
+        int max_scroll = std::max(0, total_configs - config_height);
+
+        // Adjust scroll if selected is out of view
+        if (selected < config_scroll) {
+            config_scroll = selected;
+        } else if (selected >= config_scroll + config_height) {
+            config_scroll = selected - config_height + 1;
+        }
+
+        // Clamp scroll to valid range
+        config_scroll = std::max(0, std::min(config_scroll, max_scroll));
+
         if (schema.empty()) {
             rows.push_back(text("[No config schema loaded]") | color(Color::White));
         } else {
-            for (const auto& [key, entry] : schema) {
-                bool is_selected = (idx == selected);
+            int start_idx = config_scroll;
+            int end_idx = std::min(start_idx + config_height, (int)keys.size());
+
+            for (int i = start_idx; i < end_idx; ++i) {
+                const auto& [key, entry] = *std::next(schema.begin(), i);
+                bool is_selected = (i == selected);
                 std::string value = config.get(key);
                 std::vector<Element> row_cells;
                 if (is_selected) {
@@ -178,8 +197,8 @@ int main(int argc, char* argv[]) {
                 row_cells.push_back(text(" (default: " + entry.defaultValue + ")") | color(Color::White));
                 Element row = hbox(row_cells) | (is_selected ? bgcolor(Color::GrayDark) : nothing);
                 rows.push_back(row);
-                idx++;
             }
+
             if (mode == Mode::Edit && !keys.empty()) {
                 std::string value = config.get(keys[selected]);
                 // Blinking cursor logic
@@ -196,20 +215,24 @@ int main(int argc, char* argv[]) {
                 } else {
                     display_value += " ";
                 }
-                rows[selected] = hbox({
-                    text("> ") | color(Color::GreenLight),
-                    text(keys[selected]) | bold,
-                    text(" = "),
-                    text(display_value) | color(Color::YellowLight),
-                    text(" (default: " + schema.at(keys[selected]).defaultValue + ")") | color(Color::White)
-                }) | bgcolor(Color::GrayDark);
+                // Update the row in the visible list if it's the selected one
+                int vis_idx = selected - config_scroll;
+                if (vis_idx >= 0 && vis_idx < (int)rows.size()) {
+                    rows[vis_idx] = hbox({
+                        text("> ") | color(Color::GreenLight),
+                        text(keys[selected]) | bold,
+                        text(" = "),
+                        text(display_value) | color(Color::YellowLight),
+                        text(" (default: " + schema.at(keys[selected]).defaultValue + ")") | color(Color::White)
+                    }) | bgcolor(Color::GrayDark);
+                }
             }
         }
         return vbox({
             text("Configuration") | bold | color(Color::Cyan) | bgcolor(Color::Blue),
             separatorEmpty(),
             vbox(std::move(rows)),
-        }) | border | bgcolor(Color::Blue) | size(HEIGHT, LESS_THAN, 20);
+        }) | border | bgcolor(Color::Blue) | size(HEIGHT, GREATER_THAN, config_height);
     });
 
     Component sensor_panel = Renderer([&] {
