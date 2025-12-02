@@ -10,6 +10,7 @@ This project includes third-party software:
 
 - **OpenSSL** (Apache License 2.0) — see [`vendor/openssl/LICENSE.txt`](vendor/openssl/LICENSE.txt)
 - **ws2811** (MIT License) — see [`vendor/ws2811/LICENSE`](vendor/ws2811/LICENSE)
+- **FTXUI** (MIT License) — see [`vendor/FTXUI/LICENSE`](vendor/FTXUI/LICENSE)
 - **nlohmann/json** (MIT License) — see [`include/nlohmann/json.hpp`](include/nlohmann/json.hpp)
 
 All third-party licenses are included in the source distribution.
