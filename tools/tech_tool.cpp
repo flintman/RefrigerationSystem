@@ -152,6 +152,7 @@ int main(int argc, char* argv[]) {
     auto schema = config.getSchema();
     int selected = 0;
     int config_scroll = 0;  // Scroll offset for config table
+    int sensor_suggestion_selected = 0;  // For sensor ID selection
     std::string edit_value;
     enum class Mode { View, Edit };
     Mode mode = Mode::View;
@@ -435,17 +436,94 @@ int main(int argc, char* argv[]) {
                     }
                     edit_value.clear();
                     editing_line = false;
+                    sensor_suggestion_selected = 0;
                     return true;
                 } else if (event == Event::Escape) {
                     edit_value.clear();
                     editing_line = false;
                     status_message = "Edit cancelled.";
+                    sensor_suggestion_selected = 0;
+                    return true;
+                } else if (event == Event::ArrowDown) {
+                    // Check if we're editing a sensor.* config
+                    const auto& key = keys[selected];
+                    if (key.find("sensor.") == 0) {
+                        // Extract sensor IDs from the sensor panel
+                        std::vector<std::string> sensor_ids;
+                        {
+                            std::lock_guard<std::mutex> lock(sensorMutex);
+                            for (const auto& line : latestSensorLines) {
+                                if (line.find("28-") != std::string::npos) {
+                                    size_t start = line.find("28-");
+                                    size_t end = start;
+                                    while (end < line.length() && (std::isalnum(line[end]) || line[end] == '-')) {
+                                        end++;
+                                    }
+                                    sensor_ids.push_back(line.substr(start, end - start));
+                                }
+                            }
+                        }
+                        if (!sensor_ids.empty() && sensor_suggestion_selected < (int)sensor_ids.size() - 1) {
+                            sensor_suggestion_selected++;
+                            edit_value = sensor_ids[sensor_suggestion_selected];
+                        }
+                    }
+                    return true;
+                } else if (event == Event::ArrowUp) {
+                    // Check if we're editing a sensor.* config
+                    const auto& key = keys[selected];
+                    if (key.find("sensor.") == 0) {
+                        std::vector<std::string> sensor_ids;
+                        {
+                            std::lock_guard<std::mutex> lock(sensorMutex);
+                            for (const auto& line : latestSensorLines) {
+                                if (line.find("28-") != std::string::npos) {
+                                    size_t start = line.find("28-");
+                                    size_t end = start;
+                                    while (end < line.length() && (std::isalnum(line[end]) || line[end] == '-')) {
+                                        end++;
+                                    }
+                                    sensor_ids.push_back(line.substr(start, end - start));
+                                }
+                            }
+                        }
+                        if (!sensor_ids.empty() && sensor_suggestion_selected > 0) {
+                            sensor_suggestion_selected--;
+                            edit_value = sensor_ids[sensor_suggestion_selected];
+                        }
+                    }
+                    return true;
+                } else if (event == Event::Tab) {
+                    // Auto-complete with selected sensor ID
+                    const auto& key = keys[selected];
+                    if (key.find("sensor.") == 0) {
+                        std::vector<std::string> sensor_ids;
+                        {
+                            std::lock_guard<std::mutex> lock(sensorMutex);
+                            for (const auto& line : latestSensorLines) {
+                                if (line.find("28-") != std::string::npos) {
+                                    size_t start = line.find("28-");
+                                    size_t end = start;
+                                    while (end < line.length() && (std::isalnum(line[end]) || line[end] == '-')) {
+                                        end++;
+                                    }
+                                    sensor_ids.push_back(line.substr(start, end - start));
+                                }
+                            }
+                        }
+                        if (!sensor_ids.empty() && sensor_suggestion_selected < (int)sensor_ids.size()) {
+                            edit_value = sensor_ids[sensor_suggestion_selected];
+                            sensor_suggestion_selected = 0;
+                        }
+                    }
                     return true;
                 } else if (event.is_character()) {
                     edit_value += event.character();
+                    sensor_suggestion_selected = 0;  // Reset when typing
                     return true;
                 } else if (event == Event::Backspace && !edit_value.empty()) {
                     edit_value.pop_back();
+                    sensor_suggestion_selected = 0;
                     return true;
                 }
                 return false;
@@ -455,7 +533,13 @@ int main(int argc, char* argv[]) {
                 if (!keys.empty()) {
                     editing_line = true;
                     edit_value = config.get(keys[selected]);
-                    status_message = "Editing value. Press Enter to save, Esc to cancel.";
+                    const auto& key = keys[selected];
+                    if (key.find("sensor.") == 0) {
+                        status_message = "Editing sensor ID. Use ↑/↓ to browse sensors, Tab to select, Enter to save.";
+                    } else {
+                        status_message = "Editing value. Press Enter to save, Esc to cancel.";
+                    }
+                    sensor_suggestion_selected = 0;
                 }
                 return true;
             }
