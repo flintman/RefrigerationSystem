@@ -623,61 +623,6 @@ int main(int argc, char* argv[]) {
             show_service_dashboard = true;
             return true;
         }
-        if (show_service_dashboard) {
-            // Service dashboard event handling
-            if (event == Event::Character('q') || event == Event::Character('Q') || event == Event::Escape) {
-                show_service_dashboard = false;
-                dashboard_message.clear();
-                // Stop log polling thread
-                dashboard_log_polling = false;
-                if (dashboard_log_thread.joinable()) dashboard_log_thread.join();
-                // Do not exit the program, just return to main dashboard
-                return true;
-            }
-            if (event == Event::ArrowDown) {
-                if (log_scroll + 1 < (int)log_lines.size()) log_scroll++;
-                return true;
-            }
-            if (event == Event::ArrowUp) {
-                if (log_scroll > 0) log_scroll--;
-                return true;
-            }
-            auto refresh_logs = [&]() {
-                std::string log_raw = RunCommandAndGetOutput("journalctl -u refrigeration.service -n 100 --no-pager 2>&1");
-                log_lines.clear();
-                size_t pos = 0, next;
-                while ((next = log_raw.find('\n', pos)) != std::string::npos) {
-                    log_lines.push_back(log_raw.substr(pos, next - pos));
-                    pos = next + 1;
-                }
-                if (pos < log_raw.size()) log_lines.push_back(log_raw.substr(pos));
-                int log_height = 15;
-                int total_lines = log_lines.size();
-                int max_scroll = std::max(0, total_lines - log_height);
-                if (log_scroll == 0 || log_scroll >= max_scroll - 1) {
-                    log_scroll = 0;
-                }
-            };
-            if (event == Event::Character('s') || event == Event::Character('S')) {
-                dashboard_message = RunCommandAndGetOutput("sudo systemctl start refrigeration.service 2>&1");
-                service_status = RunCommandAndGetOutput("systemctl is-active refrigeration.service 2>&1");
-                refresh_logs();
-                return true;
-            }
-            if (event == Event::Character('t') || event == Event::Character('T')) {
-                dashboard_message = RunCommandAndGetOutput("sudo systemctl stop refrigeration.service 2>&1");
-                service_status = RunCommandAndGetOutput("systemctl is-active refrigeration.service 2>&1");
-                refresh_logs();
-                return true;
-            }
-            if (event == Event::Character('r') || event == Event::Character('R')) {
-                dashboard_message = RunCommandAndGetOutput("sudo systemctl restart refrigeration.service 2>&1");
-                service_status = RunCommandAndGetOutput("systemctl is-active refrigeration.service 2>&1");
-                refresh_logs();
-                return true;
-            }
-            return false;
-        }
         return false;
     });
 
