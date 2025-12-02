@@ -29,29 +29,22 @@ This is my software to control a refrigeration system with a Raspberry Pi.
 
 ```sh
 sudo apt-get install libssl-dev build-essential gcc make g++-aarch64-linux-gnu
-# 1. Build OpenSSL vendor libraries (required before any build):
-make openssl
-# 2. Build the project:
-make            # Build .deb
-make clean      # Clean build folder (does NOT clean OpenSSL)
+# Build the project (OpenSSL and FTXUI are built automatically if needed):
+make            # Build everything except server (.deb, OpenSSL, FTXUI)
+make clean      # Clean build folder (preserves vendor builds: OpenSSL, FTXUI)
+make clean-all  # Clean everything including vendor builds
 ```
 
 **Note:**
-- You must run `make openssl` once before any build, or after changing/copying OpenSSL sources.
-- OpenSSL is NOT rebuilt or cleaned automatically on every build. To refresh or fully rebuild OpenSSL, use:
-
-```sh
-make openssl-clean   # Only use this to force a full OpenSSL rebuild
-make openssl         # Rebuild OpenSSL after cleaning
-```
-
-This avoids unnecessary rebuilds of OpenSSL, which rarely changes.
+- `make` automatically builds OpenSSL and FTXUI on first build or if they're missing.
+- `make clean` preserves vendor builds to avoid unnecessary rebuilds.
+- `make clean-all` completely cleans everything including vendor builds.
 
 ### Server
 
 ```sh
-make server         # Build server .deb
-make server-clean   # Clean the directory
+make server         # Build server .deb (OpenSSL auto-built if needed)
+make server-clean   # Clean the server build
 ```
 
 ## Server Dependencies
