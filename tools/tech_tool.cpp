@@ -135,6 +135,7 @@ int main(int argc, char* argv[]) {
     std::atomic<bool> pollingActive{true};
     std::vector<std::string> latestSensorLines;
     std::mutex sensorMutex;
+    auto screen = ScreenInteractive::Fullscreen();  // Create screen early for posting events
     std::thread polling_thread([&] {
         while (pollingActive) {
             auto lines = sensors.readOneWireTempSensors();
@@ -142,6 +143,7 @@ int main(int argc, char* argv[]) {
                 std::lock_guard<std::mutex> lock(sensorMutex);
                 latestSensorLines = std::move(lines);
             }
+            screen.PostEvent(Event::Custom);  // Force UI refresh when sensors update
             std::this_thread::sleep_for(std::chrono::seconds(2));
         }
     });
@@ -253,7 +255,6 @@ int main(int argc, char* argv[]) {
         }) | border | bgcolor(Color::Blue) | size(HEIGHT, LESS_THAN, 20);
     });
 
-    auto screen = ScreenInteractive::Fullscreen();
     Component status_bar = Renderer([&] {
         std::string mode_str = (mode == Mode::Edit) ? "[EDIT MODE]" : "[VIEW MODE]";
         return hbox({
