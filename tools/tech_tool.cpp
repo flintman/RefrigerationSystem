@@ -322,14 +322,14 @@ int main(int argc, char* argv[]) {
         } else {
             return vbox({
                 help_panel->Render(),
+                status_bar->Render(),
                 separatorEmpty(),
                 hbox({
                     config_table->Render(),
                     separatorEmpty(),
                     sensor_panel->Render()
                 }),
-                separatorEmpty(),
-                status_bar->Render()
+                separatorEmpty()
             }) | bgcolor(Color::Black);
         }
     }), [&](Event event) {
