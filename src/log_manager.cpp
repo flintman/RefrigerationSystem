@@ -175,10 +175,9 @@ void Logger::log_conditions(float setpoint, float return_sensor, float coil_sens
                  + "Compressor: " + systems_status.at("compressor") + ", "
                  + "Fan: " + systems_status.at("fan") + ", "
                  + "Valve: " + systems_status.at("valve") + ", "
-                 + "Electric_heater: " + (systems_status.count("electric_heater") ? systems_status.at("electric_heater") : "N/A")
-                 + "\n";
+                 + "Electric_heater: " + (systems_status.count("electric_heater") ? systems_status.at("electric_heater") : "N/A");
 
-        log_to_file(log_file_path, log_line);
+        log_to_file(log_file_path, log_line + "\n");
         log_events("Debug", log_line);
     } catch (const std::exception& e) {
         std::cerr << "Error logging conditions: " << e.what() << std::endl;

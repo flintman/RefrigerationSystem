@@ -69,6 +69,8 @@
         "condition_variable": "cpp",
         "mutex": "cpp",
         "csignal": "cpp",
-        "cinttypes": "cpp"
+        "cinttypes": "cpp",
+        "future": "cpp",
+        "list": "cpp"
     }
 }

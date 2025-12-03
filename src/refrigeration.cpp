@@ -943,7 +943,7 @@ int main(int argc, char* argv[]) {
     std::signal(SIGINT, signalHandler);
 
     if (geteuid() != 0) {
-        std::cerr << "This tool must be run as root (sudo).\n";
+        logger.log_events("Debug", "This tool must be run as root (sudo).");
         return 1;
     }
 
@@ -951,14 +951,14 @@ int main(int argc, char* argv[]) {
         std::string arg = argv[i];
         if (arg == "demo_mode=true" || arg == "--demo" || arg == "-d") {
             demo_mode = true;
-            std::cout << "Demo mode enabled!\n";
+            logger.log_events("Debug", "Demo mode enabled!");
         }
     }
 
-    std::cout << "Welcome to the Refrigeration system \n";
-    std::cout << "The system is starting up please wait \n";
-    std::cout << "Press Ctrl+C to exit gracefully\n";
-    std::cout << "Version: " << version << "\n";
+    logger.log_events("Debug", "Welcome to the Refrigeration system");
+    logger.log_events("Debug", "The system is starting up please wait");
+    logger.log_events("Debug", "Press Ctrl+C to exit gracefully");
+    logger.log_events("Debug", "Version: " + version);
     logger.log_events("Debug", "System started up");
 
     try {
@@ -967,7 +967,7 @@ int main(int argc, char* argv[]) {
             std::thread hotspot_system(hotspot_start);
             hotspot_system.join();
             running = false; // Stop all threads if any were started elsewhere
-            std::cout << "Exiting because sensors are not initialized.\n";
+            logger.log_events("Debug", "Exiting because sensors are not initialized.");
             // If running as a systemd service, request stop:
             system("systemctl stop refrigeration.service");
             return 0;
