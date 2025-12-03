@@ -839,7 +839,7 @@ int main(int argc, char* argv[]) {
                     // Force UI refresh for live effect
                     screen.PostEvent(Event::Custom);
                     // Sleep in smaller chunks so we can respond quickly to exit
-                    for (int i = 0; i < 100 && dashboard_log_polling; ++i) {
+                    for (int i = 0; i < 250 && dashboard_log_polling; ++i) {
                         std::this_thread::sleep_for(std::chrono::milliseconds(100));
                     }
                 }
