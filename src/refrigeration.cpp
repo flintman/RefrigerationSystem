@@ -705,7 +705,7 @@ void checkAlarms_system(){
         if (systemAlarm.getShutdownStatus()) {
             if (status_ != "Alarm") {
                 alarm_mode();
-                if (!sent_alarm_status) {
+                if (!sent_alarm_status && cfg.get("client.enable_send_data") == "1") {
                     logger.log_events("Debug", "Alarm detected, Sending Data to the site.");
                     bool resend = secure_client_send(); // Send alarm status to server
                     sent_alarm_status = true;
