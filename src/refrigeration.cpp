@@ -460,8 +460,8 @@ void setpoint_system_buttons(float min_setpoint, float max_setpoint) {
                     logger.log_events("Debug", "Setpoint mode exited due to inactivity (no save)");
                 }
             }
-            std::this_thread::sleep_for(std::chrono::milliseconds(200));
         }
+        std::this_thread::sleep_for(std::chrono::milliseconds(200));
     }
 }
 
