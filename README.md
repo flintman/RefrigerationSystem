@@ -107,7 +107,7 @@ The IP address will display on the inside screen. The hotspot remains active for
 - **Buttons:**
   - Press/hold either button for 2s: display flashes setpoint.
   - Use up/down to adjust. Hold >5s to skip by 5.
-  - Press both buttons to save and exit.
+  - Press alarm button to save and exit.
   - Inactivity exits without saving.
 
 ---

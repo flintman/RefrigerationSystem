@@ -451,12 +451,6 @@ void setpoint_system_buttons(float min_setpoint, float max_setpoint) {
                 // Down
                 setpoint = std::max(current_setpoint - step, min_setpoint);
                 setpointModeStart = time(nullptr); // Reset timer on press
-            } else if (up_pressed && down_pressed) {
-                // Save and exit setpoint mode
-                cfg.set("unit.setpoint", std::to_string(static_cast<int>(setpoint.load())));
-                cfg.save();
-                setpointMode = false;
-                logger.log_events("Debug", "Setpoint saved and button mode exited");
             } else {
                 setpointPressedDuration = time(nullptr);
                 // If no button pressed for 10 seconds, exit without saving
@@ -590,6 +584,13 @@ void checkDefrostPin() {
 void checkAlarmPin(){
     if (gpio.read("alarm_pin")) {
         if (alarm_reset_button_press_start_time == 0) {
+            if(setpointMode){
+                // Save and exit setpoint mode
+                cfg.set("unit.setpoint", std::to_string(static_cast<int>(setpoint.load())));
+                cfg.save();
+                setpointMode = false;
+                logger.log_events("Debug", "Setpoint saved and button mode exited");
+            }
             logger.log_events("Debug", "Alarm Button Pushed");
             alarm_reset_button_press_start_time = std::chrono::duration<double>(std::chrono::system_clock::now().time_since_epoch()).count();
         }
