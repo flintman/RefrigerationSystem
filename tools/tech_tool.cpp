@@ -581,6 +581,7 @@ int main(int argc, char* argv[]) {
             if (event == Event::Character('q') || event == Event::Character('Q') || event == Event::Escape) {
                 show_service_dashboard = false;
                 dashboard_message.clear();
+
                 // Stop log polling thread
                 dashboard_log_polling = false;
                 if (dashboard_log_thread.joinable()) dashboard_log_thread.join();
@@ -837,7 +838,10 @@ int main(int argc, char* argv[]) {
                     fetch_logs();
                     // Force UI refresh for live effect
                     screen.PostEvent(Event::Custom);
-                    std::this_thread::sleep_for(std::chrono::milliseconds(500));
+                    // Sleep in smaller chunks so we can respond quickly to exit
+                    for (int i = 0; i < 100 && dashboard_log_polling; ++i) {
+                        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                    }
                 }
             });
             // Always scroll to bottom when opening dashboard
