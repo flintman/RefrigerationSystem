@@ -29,6 +29,8 @@
 #include <csignal>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
+#include <ctime>
 #include <sys/wait.h>
 #include <chrono>
 
@@ -103,6 +105,36 @@ std::string RunCommandAndGetOutput(const std::string& cmd) {
     }
     pclose(pipe);
     return result;
+}
+
+// Helper to get today's events log file
+std::string GetTodaysEventLogPath() {
+    auto now = std::time(nullptr);
+    auto tm = *std::localtime(&now);
+    char buffer[32];
+    std::strftime(buffer, sizeof(buffer), "%Y-%m-%d", &tm);
+    return std::string("/var/log/refrigeration/events-") + buffer + ".log";
+}
+
+// Helper to read events log file (read-only stream if service active)
+std::vector<std::string> ReadEventsLog() {
+    std::string log_path = GetTodaysEventLogPath();
+    std::vector<std::string> lines;
+    FILE* file = fopen(log_path.c_str(), "r");
+    if (!file) {
+        lines.push_back("[Log file not found: " + log_path + "]");
+        return lines;
+    }
+    char buffer[512];
+    while (fgets(buffer, sizeof(buffer), file)) {
+        size_t len = strlen(buffer);
+        if (len > 0 && buffer[len-1] == '\n') {
+            buffer[len-1] = '\0';
+        }
+        lines.push_back(buffer);
+    }
+    fclose(file);
+    return lines;
 }
 
 int main(int argc, char* argv[]) {
@@ -359,14 +391,7 @@ int main(int argc, char* argv[]) {
                 return true;
             }
             auto refresh_logs = [&]() {
-                std::string log_raw = RunCommandAndGetOutput("journalctl -u refrigeration.service -n 100 --no-pager 2>&1");
-                log_lines.clear();
-                size_t pos = 0, next;
-                while ((next = log_raw.find('\n', pos)) != std::string::npos) {
-                    log_lines.push_back(log_raw.substr(pos, next - pos));
-                    pos = next + 1;
-                }
-                if (pos < log_raw.size()) log_lines.push_back(log_raw.substr(pos));
+                log_lines = ReadEventsLog();
                 int log_height = 15;
                 int total_lines = log_lines.size();
                 int max_scroll = std::max(0, total_lines - log_height);
@@ -595,14 +620,7 @@ int main(int argc, char* argv[]) {
             // Fetch status and logs
             service_status = RunCommandAndGetOutput("systemctl is-active refrigeration.service 2>&1");
             auto fetch_logs = [&]() {
-                std::string log_raw = RunCommandAndGetOutput("journalctl -u refrigeration.service -n 100 --no-pager 2>&1");
-                log_lines.clear();
-                size_t pos = 0, next;
-                while ((next = log_raw.find('\n', pos)) != std::string::npos) {
-                    log_lines.push_back(log_raw.substr(pos, next - pos));
-                    pos = next + 1;
-                }
-                if (pos < log_raw.size()) log_lines.push_back(log_raw.substr(pos));
+                log_lines = ReadEventsLog();
             };
             fetch_logs();
             // Start background polling thread for logs
@@ -616,8 +634,6 @@ int main(int argc, char* argv[]) {
                 }
             });
             // Always scroll to bottom when opening dashboard
-            int log_height = 15;
-            int total_lines = log_lines.size();
             log_scroll = 0;
             dashboard_message.clear();
             show_service_dashboard = true;
