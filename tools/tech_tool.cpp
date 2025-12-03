@@ -36,6 +36,7 @@
 #include <sstream>
 #include <algorithm>
 #include <time.h>
+#include <filesystem>
 
 using namespace ftxui;
 
@@ -122,7 +123,19 @@ std::string GetTodaysEventLogPath() {
 // Helper to read events log file (read-only stream if service active)
 std::vector<std::string> ReadEventsLog() {
     std::string log_path = GetTodaysEventLogPath();
+    std::string lock_file = log_path + ".lock";
     std::vector<std::string> lines;
+
+    // Wait intelligently for any ongoing writes to complete
+    int max_wait_cycles = 20;  // ~200ms total with 10ms sleeps
+    for (int wait = 0; wait < max_wait_cycles; ++wait) {
+        // Check if lock file exists (writer is active)
+        if (!std::filesystem::exists(lock_file)) {
+            break;  // Lock released, safe to read
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+
     FILE* file = fopen(log_path.c_str(), "r");
     if (!file) {
         lines.push_back("[Log file not found: " + log_path + "]");
@@ -192,10 +205,21 @@ std::vector<ConditionDataPoint> ReadConditionsLog() {
     char buffer[32];
     std::strftime(buffer, sizeof(buffer), "%Y-%m-%d", &tm);
     log_path += std::string(buffer) + ".log";
+    std::string lock_file = log_path + ".lock";
 
     std::vector<ConditionDataPoint> data;
-    
-    // Try to open file with retries to handle concurrent access
+
+    // Wait for any ongoing writes to complete
+    int max_wait_cycles = 20;  // ~200ms total with 10ms sleeps
+    for (int wait = 0; wait < max_wait_cycles; ++wait) {
+        // Check if lock file exists (writer is active)
+        if (!std::filesystem::exists(lock_file)) {
+            break;  // Lock released, safe to read
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+
+    // Try to open file with retries
     FILE* file = nullptr;
     int max_retries = 3;
     for (int i = 0; i < max_retries; ++i) {
@@ -205,9 +229,9 @@ std::vector<ConditionDataPoint> ReadConditionsLog() {
             std::this_thread::sleep_for(std::chrono::milliseconds(50));
         }
     }
-    
-    if (!file) return data;
 
+    if (!file)
+        return data;
     char line_buf[512];
     time_t six_hours_ago = now - (6 * 3600);
 
