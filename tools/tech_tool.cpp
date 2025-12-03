@@ -33,6 +33,9 @@
 #include <ctime>
 #include <sys/wait.h>
 #include <chrono>
+#include <sstream>
+#include <algorithm>
+#include <time.h>
 
 using namespace ftxui;
 
@@ -137,11 +140,179 @@ std::vector<std::string> ReadEventsLog() {
     return lines;
 }
 
+// Structure to hold condition data point
+struct ConditionDataPoint {
+    time_t timestamp;
+    float setpoint;
+    float return_sensor;
+    float coil_sensor;
+    float supply;
+};
+
+// Parse a conditions log line
+bool ParseConditionLine(const std::string& line, ConditionDataPoint& point) {
+    // Format: 2025-12-02 06:07:23 - Setpoint: 55.000000, Return Sensor: 61.799999, Coil Sensor: 60.700001, Supply: 62.900002, ...
+    std::istringstream iss(line);
+    std::string date, time_str, dash;
+    if (!(iss >> date >> time_str >> dash)) return false;
+
+    struct tm tm_info = {};
+    if (!strptime((date + " " + time_str).c_str(), "%Y-%m-%d %H:%M:%S", &tm_info)) return false;
+    point.timestamp = mktime(&tm_info);
+
+    std::string token;
+    while (std::getline(iss, token, ',')) {
+        size_t colon_pos = token.find(':');
+        if (colon_pos == std::string::npos) continue;
+
+        std::string key = token.substr(0, colon_pos);
+        std::string value_str = token.substr(colon_pos + 1);
+
+        // Trim whitespace
+        key.erase(0, key.find_first_not_of(" "));
+        key.erase(key.find_last_not_of(" ") + 1);
+        value_str.erase(0, value_str.find_first_not_of(" "));
+        value_str.erase(value_str.find_last_not_of(" ") + 1);
+
+        try {
+            if (key == "Setpoint") point.setpoint = std::stof(value_str);
+            else if (key == "Return Sensor") point.return_sensor = std::stof(value_str);
+            else if (key == "Coil Sensor") point.coil_sensor = std::stof(value_str);
+            else if (key == "Supply") point.supply = std::stof(value_str);
+        } catch (...) { }
+    }
+    return true;
+}
+
+// Read conditions log file and filter to last 6 hours
+std::vector<ConditionDataPoint> ReadConditionsLog() {
+    std::string log_path = "/var/log/refrigeration/conditions-";
+    auto now = std::time(nullptr);
+    auto tm = *std::localtime(&now);
+    char buffer[32];
+    std::strftime(buffer, sizeof(buffer), "%Y-%m-%d", &tm);
+    log_path += std::string(buffer) + ".log";
+
+    std::vector<ConditionDataPoint> data;
+    
+    // Try to open file with retries to handle concurrent access
+    FILE* file = nullptr;
+    int max_retries = 3;
+    for (int i = 0; i < max_retries; ++i) {
+        file = fopen(log_path.c_str(), "r");
+        if (file) break;
+        if (i < max_retries - 1) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        }
+    }
+    
+    if (!file) return data;
+
+    char line_buf[512];
+    time_t six_hours_ago = now - (6 * 3600);
+
+    while (fgets(line_buf, sizeof(line_buf), file)) {
+        std::string line(line_buf);
+        if (!line.empty() && line.back() == '\n') line.pop_back();
+
+        ConditionDataPoint point = {};
+        if (ParseConditionLine(line, point) && point.timestamp >= six_hours_ago) {
+            data.push_back(point);
+        }
+    }
+    fclose(file);
+    return data;
+}
+
+// Generate ASCII graph of temperature data
+std::vector<std::string> GenerateTemperatureGraph(const std::vector<ConditionDataPoint>& data, int width = 80, int height = 10) {
+    std::vector<std::string> graph;
+
+    if (data.empty()) {
+        graph.push_back("[No data available for the last 6 hours]");
+        return graph;
+    }
+
+    // Find min/max temperatures
+    float min_temp = data[0].setpoint;
+    float max_temp = data[0].setpoint;
+    for (const auto& point : data) {
+        min_temp = std::min(min_temp, std::min({point.setpoint, point.return_sensor, point.coil_sensor, point.supply}));
+        max_temp = std::max(max_temp, std::max({point.setpoint, point.return_sensor, point.coil_sensor, point.supply}));
+    }
+
+    // Add some padding
+    float range = max_temp - min_temp;
+    if (range < 1.0f) range = 1.0f;
+    min_temp -= range * 0.05f;
+    max_temp += range * 0.05f;
+
+    // Sample data points to fit width
+    std::vector<ConditionDataPoint> sampled;
+    if (data.size() <= width) {
+        sampled = data;
+    } else {
+        int step = data.size() / width;
+        for (size_t i = 0; i < data.size(); i += step) {
+            sampled.push_back(data[i]);
+        }
+        if (sampled.back().timestamp != data.back().timestamp) {
+            sampled.push_back(data.back());
+        }
+    }
+
+    // Normalize and create graph
+    std::vector<std::vector<char>> grid(height, std::vector<char>(sampled.size(), ' '));
+
+    for (size_t x = 0; x < sampled.size(); ++x) {
+        const auto& point = sampled[x];
+        // Plot all 4 temperature values
+        auto plot_temp = [&](float temp, char symbol) {
+            int y = height - 1 - (int)((temp - min_temp) / (max_temp - min_temp) * (height - 1));
+            y = std::max(0, std::min(height - 1, y));
+            if (grid[y][x] == ' ') grid[y][x] = symbol;
+        };
+        plot_temp(point.setpoint, 'S');       // Setpoint
+        plot_temp(point.return_sensor, 'R');  // Return sensor
+        plot_temp(point.coil_sensor, 'C');    // Coil sensor
+        plot_temp(point.supply, 'P');         // suPply
+    }
+
+    // Format as strings
+    char y_label[16];
+    for (int y = 0; y < height; ++y) {
+        float temp = max_temp - (float)y / (height - 1) * (max_temp - min_temp);
+        snprintf(y_label, sizeof(y_label), "%5.1f|", temp);
+        std::string row(y_label);
+        for (size_t x = 0; x < grid[y].size(); ++x) {
+            row += grid[y][x];
+        }
+        graph.push_back(row);
+    }
+
+    // Add legend and time range
+    graph.push_back("      +" + std::string(sampled.size(), '-'));
+    graph.push_back("Legend: S=Setpoint, R=Return, C=Coil, P=Supply");
+
+    if (!data.empty()) {
+        auto first_tm = *std::localtime(&data.front().timestamp);
+        auto last_tm = *std::localtime(&data.back().timestamp);
+        char time_range[128];
+        snprintf(time_range, sizeof(time_range), "Time range: %02d:%02d - %02d:%02d",
+                first_tm.tm_hour, first_tm.tm_min, last_tm.tm_hour, last_tm.tm_min);
+        graph.push_back(time_range);
+    }
+
+    return graph;
+}
+
 int main(int argc, char* argv[]) {
     // Refrigeration service dashboard state
     static bool show_service_dashboard = false;
     static int log_scroll = 0;
     static std::vector<std::string> log_lines;
+    static std::vector<ConditionDataPoint> conditions_data;
+    static std::vector<std::string> temperature_graph;
     static std::atomic<bool> dashboard_log_polling{false};
     static std::thread dashboard_log_thread;
     static std::string service_status;
@@ -331,13 +502,21 @@ int main(int argc, char* argv[]) {
                 text(dashboard_message) | color(Color::White)
             }) | border | bgcolor(Color::Blue);
 
+            // Temperature graph block (last 6 hours)
+            std::vector<Element> graph_elems;
+            graph_elems.push_back(text("Temperature History (Last 6 Hours):") | bold | color(Color::White));
+            for (const auto& graph_line : temperature_graph) {
+                graph_elems.push_back(text(graph_line) | color(Color::White));
+            }
+            Element graph_block = vbox(graph_elems) | border | bgcolor(Color::Blue);
+
             // Log block (scrollable)
-            int log_height = 15;
+            int log_height = 8;
             int total_lines = log_lines.size();
             int start_line = std::max(0, total_lines - log_height - log_scroll);
             int end_line = std::min(total_lines, start_line + log_height);
             std::vector<Element> log_elems;
-            log_elems.push_back(text("Recent Logs:") | bold | color(Color::White));
+            log_elems.push_back(text("Recent Event Logs:") | bold | color(Color::White));
             for (int i = start_line; i < end_line; ++i) {
                 log_elems.push_back(text(log_lines[i]) | color(Color::White));
             }
@@ -349,6 +528,8 @@ int main(int argc, char* argv[]) {
                 text("Refrigeration Service Dashboard") | bold | color(Color::White) | bgcolor(Color::Blue) | hcenter,
                 separator(),
                 status_block,
+                separator(),
+                graph_block,
                 separator(),
                 log_block
             }) | bgcolor(Color::Blue);
@@ -621,6 +802,8 @@ int main(int argc, char* argv[]) {
             service_status = RunCommandAndGetOutput("systemctl is-active refrigeration.service 2>&1");
             auto fetch_logs = [&]() {
                 log_lines = ReadEventsLog();
+                conditions_data = ReadConditionsLog();
+                temperature_graph = GenerateTemperatureGraph(conditions_data);
             };
             fetch_logs();
             // Start background polling thread for logs
