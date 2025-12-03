@@ -72,7 +72,6 @@ void Logger::log_to_file(const std::string& log_file_path, const std::string& lo
         std::ofstream log_file(log_file_path, std::ios::app);
         if (log_file.is_open()) {
             log_file << log_line;
-            std::cout << log_line;
             log_file.close();
         } else {
             std::cerr << "Failed to open log file: " << log_file_path << std::endl;
@@ -180,6 +179,7 @@ void Logger::log_conditions(float setpoint, float return_sensor, float coil_sens
                  + "\n";
 
         log_to_file(log_file_path, log_line);
+        log_events("Debug", log_line);
     } catch (const std::exception& e) {
         std::cerr << "Error logging conditions: " << e.what() << std::endl;
     }
@@ -191,7 +191,7 @@ void Logger::log_events(const std::string& event_type, const std::string& event_
             std::string log_file_path = get_log_filename("events");
             std::string timestamp = get_current_datetime();
             std::string log_line = "[" + timestamp + "] " + event_type + "] " + event_message + "\n";
-
+            std::cout << log_line;
             log_to_file(log_file_path, log_line);
         }
     } catch (const std::exception& e) {
