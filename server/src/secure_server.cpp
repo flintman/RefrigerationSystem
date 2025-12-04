@@ -422,29 +422,64 @@ void SecureServer::start_socket_server() {
 void SecureServer::handle_client(SSL* ssl, const std::string& client_ip) {
     log("Handling client " + client_ip);
 
+    // Set read timeout on SSL connection (5 seconds)
+    BIO* bio = SSL_get_rbio(ssl);
+    if (bio) {
+        BIO_set_nbio(bio, 1);  // Set non-blocking mode
+    }
+
     char buffer[1024] = {0};
     std::string data;
+    const int MAX_READ_TIME_MS = 5000;  // 5 second timeout
+    const int READ_RETRY_INTERVAL_MS = 100;
+    int elapsed_ms = 0;
+    const size_t MAX_DATA_SIZE = 16384;  // 16KB max per client
 
-    // Read data from client via SSL
-    while (running_) {
+    // Read data from client via SSL with timeout
+    while (running_ && elapsed_ms < MAX_READ_TIME_MS && data.size() < MAX_DATA_SIZE) {
         int bytes_read = SSL_read(ssl, buffer, sizeof(buffer) - 1);
-        if (bytes_read <= 0) {
-            log("No more data from " + client_ip);
-            break;
-        }
 
-        buffer[bytes_read] = '\0';
-        data += buffer;
+        if (bytes_read > 0) {
+            buffer[bytes_read] = '\0';
+            data += buffer;
+            elapsed_ms = 0;  // Reset timeout on successful read
 
-        // Check if we have a complete JSON message
-        if (data.find('}') != std::string::npos) {
-            log("End of JSON detected from " + client_ip);
-            break;
+            // Check if we have a complete JSON message
+            if (data.find('}') != std::string::npos) {
+                log("End of JSON detected from " + client_ip);
+                break;
+            }
+        } else {
+            int ssl_error = SSL_get_error(ssl, bytes_read);
+            if (ssl_error == SSL_ERROR_WANT_READ || ssl_error == SSL_ERROR_WANT_WRITE) {
+                // Non-blocking socket would block, retry
+                elapsed_ms += READ_RETRY_INTERVAL_MS;
+                std::this_thread::sleep_for(std::chrono::milliseconds(READ_RETRY_INTERVAL_MS));
+            } else if (ssl_error == SSL_ERROR_ZERO_RETURN) {
+                // Client closed connection gracefully
+                log("Client " + client_ip + " closed connection");
+                break;
+            } else {
+                // Error or connection closed
+                log("SSL read error from " + client_ip + " (error code: " + std::to_string(ssl_error) + ")");
+                break;
+            }
         }
     }
 
+    // Validate we got data before processing
     if (data.empty()) {
         log("No data received from " + client_ip);
+        return;
+    }
+
+    if (data.size() >= MAX_DATA_SIZE) {
+        log("Data from " + client_ip + " exceeded maximum size, rejecting");
+        return;
+    }
+
+    if (elapsed_ms >= MAX_READ_TIME_MS) {
+        log("Read timeout from " + client_ip + " - possible slow client or attack");
         return;
     }
 
@@ -536,29 +571,52 @@ void SecureServer::handle_client(SSL* ssl, const std::string& client_ip) {
 void SecureServer::handle_client_no_ssl(int client_fd, const std::string& client_ip) {
     log("Handling client " + client_ip + " (non-SSL)");
 
+    // Set socket receive timeout (5 seconds)
+    struct timeval tv;
+    tv.tv_sec = 5;
+    tv.tv_usec = 0;
+    setsockopt(client_fd, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv, sizeof(tv));
+
     char buffer[1024] = {0};
     std::string data;
+    const size_t MAX_DATA_SIZE = 16384;  // 16KB max per client
 
-    // Read data from client
-    while (running_) {
+    // Read data from client with timeout
+    while (running_ && data.size() < MAX_DATA_SIZE) {
         int bytes_read = recv(client_fd, buffer, sizeof(buffer) - 1, 0);
-        if (bytes_read <= 0) {
-            log("No more data from " + client_ip);
+
+        if (bytes_read > 0) {
+            buffer[bytes_read] = '\0';
+            data += buffer;
+
+            // Check if we have a complete JSON message
+            if (data.find('}') != std::string::npos) {
+                log("End of JSON detected from " + client_ip);
+                break;
+            }
+        } else if (bytes_read == 0) {
+            // Client closed connection gracefully
+            log("Client " + client_ip + " closed connection");
             break;
-        }
-
-        buffer[bytes_read] = '\0';
-        data += buffer;
-
-        // Check if we have a complete JSON message
-        if (data.find('}') != std::string::npos) {
-            log("End of JSON detected from " + client_ip);
+        } else {
+            // Error or timeout
+            if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                log("Read timeout from " + client_ip + " - possible slow client or attack");
+            } else {
+                log("Error reading from " + client_ip + " (errno: " + std::to_string(errno) + ")");
+            }
             break;
         }
     }
 
+    // Validate we got data before processing
     if (data.empty()) {
         log("No data received from " + client_ip);
+        return;
+    }
+
+    if (data.size() >= MAX_DATA_SIZE) {
+        log("Data from " + client_ip + " exceeded maximum size, rejecting");
         return;
     }
 
