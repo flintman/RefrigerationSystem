@@ -10,6 +10,7 @@
  */
 
 #include "refrigeration.h"
+
 #include <iostream>
 #include <thread>
 #include <chrono>
@@ -84,6 +85,8 @@ void update_sensor_thread() {
 
         std::this_thread::sleep_for(milliseconds(1000));
     }
+
+    // On thread exit, set all GPIO outputs to safe state
     if(cfg.get("unit.relay_active_low") == "0") {
         // Set all outputs to OFF for normally closed relays
         gpio.write("fan_pin", false);
@@ -99,6 +102,9 @@ void update_sensor_thread() {
     }
     std::this_thread::sleep_for(milliseconds(100)); // Give time for GPIO to settle
     logger.log_events("Debug", "Sensor thread stopped");
+    // Stop API server and join thread
+    api.stop();
+    logger.log_events("Debug", "API server stopped from sensor thread");
 }
 
 void null_mode() {
@@ -769,6 +775,11 @@ void pretrip_mode() {
     }
 }
 
+void api_system_thread() {
+    api.start();
+    logger.log_events("Debug", "API api_system_thread Stopped");
+}
+
 void interruptible_sleep(int total_seconds) {
     for (int i = 0; i < total_seconds && running; ++i) {
         std::this_thread::sleep_for(std::chrono::seconds(1));
@@ -832,13 +843,17 @@ int main(int argc, char* argv[]) {
                 });
             };
 
+
+
             std::thread refrigeration_thread = start_thread(update_sensor_thread, "refrigeration_thread");
             std::thread setpoint_thread = start_thread(setpoint_system_thread, "setpoint_thread");
             std::thread display_system = start_thread(display_system_thread, "display_system_thread");
             std::thread ws8211_system = start_thread(ws8211_system_thread, "ws8211_system_thread");
             std::thread button_system = start_thread(button_system_thread, "button_system_thread");
             std::thread alarm_system = start_thread(checkAlarms_system, "alarm_system_thread");
+            std::thread api_system = start_thread(api_system_thread, "api_system_thread");
             std::thread hotspot_system(hotspot_start); // Hotspot: do not restart
+
 
             refrigeration_thread.join();
             setpoint_thread.join();
@@ -847,6 +862,7 @@ int main(int argc, char* argv[]) {
             button_system.join();
             hotspot_system.join();
             alarm_system.join();
+            api_system.join();
 
             logger.clear_old_logs(log_retention_period);
         }

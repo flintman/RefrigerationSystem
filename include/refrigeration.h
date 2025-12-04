@@ -17,6 +17,7 @@
 #include "wifi_manager.h"
 #include "alarm.h"
 #include "demo_refrigeration.h"
+#include "refrigeration_API.h"
 
 // Version and config
 inline const std::string version = "2.1.0"; //Make sure you update the version in Makefile.
@@ -39,6 +40,7 @@ inline Logger logger(debug_code.load());
 inline WiFiManager wifi_manager;
 inline Alarm systemAlarm;
 inline DemoRefrigeration demo;
+inline RefrigerationAPI api(stoi(cfg.get("api.port")), config_file_name, &logger);
 
 // Alarm state
 inline std::atomic<bool> isShutdownAlarm{false};
