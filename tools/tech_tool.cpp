@@ -72,31 +72,32 @@ void StopSensorPolling(AppState& state) {
     state.polling1stfetch = false;
 }
 
-// Helper to kill refrigeration process (unchanged)
+// Helper to kill refrigeration process
 int KillRefrigerationProcess() {
-    system("sudo systemctl stop refrigeration.service");
-    FILE* pipe = popen("pgrep -x refrigeration", "r");
-    if (!pipe) return 0;
-    char buffer[128];
-    bool killed = false;
-    while (fgets(buffer, sizeof(buffer), pipe)) {
-        int pid = atoi(buffer);
-        if (pid > 0) {
-            kill(pid, SIGINT);
-            killed = true;
+    // Step 1: Try graceful systemctl stop
+    system("sudo systemctl stop refrigeration.service 2>/dev/null");
+    std::this_thread::sleep_for(std::chrono::seconds(1));
+
+    // Step 2: Send SIGTERM to any remaining processes
+    system("pkill -TERM refrigeration 2>/dev/null");
+    std::this_thread::sleep_for(std::chrono::milliseconds(500));
+
+    // Step 3: Force kill any stragglers with SIGKILL
+    system("pkill -KILL refrigeration 2>/dev/null");
+    std::this_thread::sleep_for(std::chrono::milliseconds(200));
+
+    // Step 4: Verify all processes are gone
+    int retries = 10;
+    while (retries-- > 0) {
+        int result = system("pgrep -x refrigeration >/dev/null 2>&1");
+        if (result != 0) {
+            // Process not found (pgrep returns non-zero when no matches)
+            return 1;  // Successfully killed
         }
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
-    pclose(pipe);
-    if (killed) {
-        while (true) {
-            FILE* check = popen("pgrep -x refrigeration", "r");
-            bool running = (fgets(buffer, sizeof(buffer), check) != nullptr);
-            pclose(check);
-            if (!running) break;
-            std::this_thread::sleep_for(std::chrono::milliseconds(200));
-        }
-    }
-    return killed ? 1 : 0;
+
+    return 0;  // Could not verify all processes killed
 }
 
 std::string RunCommandAndGetOutput(const std::string& cmd) {
