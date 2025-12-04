@@ -17,7 +17,6 @@
 #include "wifi_manager.h"
 #include "alarm.h"
 #include "demo_refrigeration.h"
-#include "secure_client.h"
 
 // Version and config
 inline const std::string version = "2.1.0"; //Make sure you update the version in Makefile.
@@ -30,7 +29,6 @@ inline std::mutex status_mutex;
 
 // Managers and hardware
 inline ConfigManager cfg(config_file_name);
-inline std::string ip_address = cfg.get("client.ip_address");
 inline GpioManager gpio;
 inline ADS1115 adc;
 inline WS2811Controller ws2811(2, 18);
@@ -41,10 +39,6 @@ inline Logger logger(stoi(cfg.get("debug.code")));
 inline WiFiManager wifi_manager;
 inline Alarm systemAlarm;
 inline DemoRefrigeration demo;
-inline std::string cert_file = cfg.get("client.cert");
-inline std::string key_file = cfg.get("client.key");
-inline std::string ca_file = cfg.get("client.ca");
-inline SecureClient secure_client(ip_address, 5001, cert_file, key_file, ca_file);
 
 // Alarm state
 inline std::atomic<bool> isShutdownAlarm(false);
@@ -91,8 +85,6 @@ inline int log_interval = stoi(cfg.get("logging.interval_mins")) * 60; // Conver
 extern time_t last_log_timestamp;
 
 // Function declarations
-bool secure_client_send();
-void secureclient_loop();
 void refrigeration_system(float return_temp_, float supply_temp_, float coil_temp_, float setpoint_);
 void display_system_thread();
 void setpoint_system_thread();

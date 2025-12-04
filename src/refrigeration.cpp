@@ -32,12 +32,9 @@ void display_all_variables() {
     std::cout << "Temperature Setpoint Offset: " << cfg.get("setpoint.offset") << "°F\n";
     std::cout << "Compressor Off Timer: " << cfg.get("compressor.off_timer") << " minutes\n";
     std::cout << "Debug Code: " << cfg.get("debug.code") << "\n";
-    std::cout << "Debug Data Sending: " << (cfg.get("client.enable_send_data") == "1" ? "Enabled" : "Disabled") << "\n";
     std::cout << "return: " << cfg.get("sensor.return") << "\n";
     std::cout << "wifi.enable_hotspot: " << cfg.get("wifi.enable_hotspot") << "\n";
     std::cout << "wifi.hotspot_password: " << cfg.get("wifi.hotspot_password") << "\n";
-    std::cout << "client.sent_mins: " << cfg.get("client.sent_mins") << "\n";
-    std::cout << "client.ip_address: " << cfg.get("client.ip_address") << "\n";
     std::cout << "coil: " << cfg.get("sensor.coil") << "\n";
     std::cout << "supply: " << cfg.get("sensor.supply") << "\n";
     std::cout << "  HAVE A NICE DAY AND LET ME KNOW IF YOU NEED HELP \n";
@@ -706,11 +703,6 @@ void checkAlarms_system(){
         if (systemAlarm.getShutdownStatus()) {
             if (status_ != "Alarm") {
                 alarm_mode();
-                if (!sent_alarm_status && cfg.get("client.enable_send_data") == "1") {
-                    logger.log_events("Debug", "Alarm detected, Sending Data to the site.");
-                    bool resend = secure_client_send(); // Send alarm status to server
-                    sent_alarm_status = true;
-                }
             }
         } else {
             if (status_ == "Alarm") {
@@ -720,136 +712,6 @@ void checkAlarms_system(){
         }
         std::this_thread::sleep_for(std::chrono::seconds(1));
     }
-}
-
-void secureclient_loop() {
-    int secureclient_timer = std::stoi(cfg.get("client.sent_mins")) * 60; // Convert minutes to seconds
-    bool resend = false;
-    std::this_thread::sleep_for(std::chrono::seconds(10)); // Wait for system to load
-
-    while (running) {
-        if (cfg.get("client.enable_send_data") == "1") {
-            bool stuck = false;
-            std::future<bool> future_send = std::async(std::launch::async, secure_client_send);
-            // Wait for up to 15 seconds for secure_client_send to finish
-            if (future_send.wait_for(std::chrono::seconds(15)) == std::future_status::ready) {
-                resend = future_send.get();
-            } else {
-                logger.log_events("Error", "secure_client_send appears stuck, skipping get() and will retry later.");
-                stuck = true;
-            }
-
-            if (!stuck && resend) {
-                logger.log_events("Debug", "Resending data due to command received.");
-                interruptible_sleep(10); // Wait before next send
-                // Try again, with timeout
-                std::future<bool> future_resend = std::async(std::launch::async, secure_client_send);
-                if (future_resend.wait_for(std::chrono::seconds(15)) == std::future_status::ready) {
-                    future_resend.get();
-                } else {
-                    logger.log_events("Error", "secure_client_send (resend) stuck, skipping.");
-                }
-            } else if (!stuck) {
-                logger.log_events("Debug", "Data sent successfully, no command received.");
-            }
-        } else {
-            logger.log_events("Debug", "Data sending is disabled. Skipping secure client send.");
-        }
-        interruptible_sleep(secureclient_timer);
-    }
-}
-
-bool secure_client_send() { // returns if we need to resend
-    float return_temp_;
-    float supply_temp_;
-    float coil_temp_;
-    std::string status_;
-    std::string status_compresor;
-    std::string status_fan;
-    std::string status_valve;
-    std::string status_electric_heater;
-    bool resend = false;
-    float setpoint_;
-
-    int secureclient_timer = std::stoi(cfg.get("client.sent_mins")) * 60; // Convert minutes to seconds
-    std::map<std::string, std::string> command;
-
-    // Protect all shared/global variables with mutexes
-    {
-        std::lock_guard<std::mutex> lock(status_mutex);
-        return_temp_ = return_temp;
-        supply_temp_ = supply_temp;
-        coil_temp_ = coil_temp;
-        setpoint_ = setpoint.load();
-        status_ = status["status"];
-        status_compresor = status["compressor"];
-        status_fan = status["fan"];
-        status_valve = status["valve"];
-        status_electric_heater = status["electric_heater"];
-    }
-
-    try {
-        // Get timestamp
-        auto now = std::chrono::system_clock::now();
-        std::time_t now_c = std::chrono::system_clock::to_time_t(now);
-        char timestamp[32];
-        std::strftime(timestamp, sizeof(timestamp), "%H:%M:%S  %m:%d:%Y", std::localtime(&now_c));
-
-        // Convert alarm codes to comma-separated string
-        auto codes = systemAlarm.getAlarmCodes();
-        std::ostringstream codes_ss;
-        for (size_t i = 0; i < codes.size(); ++i) {
-            codes_ss << codes[i];
-            if (i + 1 < codes.size()) codes_ss << ",";
-        }
-
-        std::ostringstream setpoint_ss, return_ss, supply_ss, coil_ss;
-        setpoint_ss << std::fixed << std::setprecision(0) << setpoint_;
-        return_ss   << std::fixed << std::setprecision(1) << return_temp_;
-        supply_ss   << std::fixed << std::setprecision(1) << supply_temp_;
-        coil_ss     << std::fixed << std::setprecision(1) << coil_temp_;
-
-        std::map<std::string, std::string> array = {
-            {"timestamp", timestamp},
-            {"unit", cfg.get("unit.number")},
-            {"alarm_codes", codes_ss.str()},
-            {"setpoint", setpoint_ss.str()},
-            {"status", status_},
-            {"compressor", status_compresor},
-            {"fan", status_fan},
-            {"valve", status_valve},
-            {"electric_heater", status_electric_heater},
-            {"return_temp", return_ss.str()},
-            {"supply_temp", supply_ss.str()},
-            {"coil_temp", coil_ss.str()}
-        };
-
-        if (wifi_manager.is_connected()) {
-            try {
-                secure_client.connect();
-                command = secure_client.send_and_receive(array);
-                logger.log_events("Debug", "Sent data, response received.");
-            } catch (const std::exception& e) {
-                logger.log_events("Error", std::string("Error in send/receive: ") + e.what());
-            }
-        } else {
-            logger.log_events("Debug", "No active internet connection. Function execution skipped.");
-        }
-    } catch (const std::exception& e) {
-        logger.log_events("Error", std::string("secureclient_loop encountered an error: ") + e.what());
-    }
-
-    // Handle command
-    if (!command.empty()) {
-        if (command["status"] == "alarm_reset") {
-            resend = true;
-            systemAlarm.resetAlarm();
-        } else if (command["status"] == "defrost") {
-            resend = true;
-            trigger_defrost = true;
-        }
-    }
-    return resend;
 }
 
 void pretrip_mode() {
@@ -999,7 +861,6 @@ int main(int argc, char* argv[]) {
             std::thread button_system = start_thread(button_system_thread, "button_system_thread");
             std::thread hotspot_system(hotspot_start); // Hotspot: do not restart
             std::thread alarm_system = start_thread(checkAlarms_system, "alarm_system_thread");
-            std::thread secureclient_system = start_thread(secureclient_loop, "secureclient_system_thread");
 
             refrigeration_thread.join();
             setpoint_thread.join();
@@ -1008,7 +869,6 @@ int main(int argc, char* argv[]) {
             button_system.join();
             hotspot_system.join();
             alarm_system.join();
-            secureclient_system.join();
 
             logger.clear_old_logs(log_retention_period);
         }

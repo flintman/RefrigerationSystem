@@ -41,20 +41,6 @@ make clean-all  # Clean everything including vendor builds
 - `make clean` preserves vendor builds to avoid unnecessary rebuilds.
 - `make clean-all` completely cleans everything including vendor builds.
 
-### Server
-
-```sh
-make server         # Build server .deb (OpenSSL auto-built if needed)
-make server-clean   # Clean the server build
-```
-
-## Server Dependencies
-
-```sh
-sudo apt-get install libcurl4-openssl-dev
-```
-
----
 
 ## Installation
 
@@ -126,63 +112,6 @@ Starts Pretrip Mode (simulates cooling, heating, and returns to cooling before p
 
 ---
 
-## Generating Keys
-
-### Common Key
-
-```sh
-openssl genrsa -out ca.key 4096
-
-openssl req -x509 -new -key ca.key -sha256 -days 3650 -out ca.pem \
-  -subj "/C=US/O=Refrigeration/OU=Root CA/CN=Refrigeration Root CA" \
-  -addext "basicConstraints=critical,CA:true" \
-  -addext "keyUsage=critical, keyCertSign, cRLSign"
-```
-
-### Server Key
-
-```sh
-openssl genrsa -out server.key 2048
-
-openssl req -new -key server.key -out server.csr \
-  -subj "/C=US/O=Refrigeration/OU=Server/CN=Refrigeration Server"
-
-openssl x509 -req -in server.csr -CA ca.pem -CAkey ca.key -CAcreateserial \
-  -out server.crt -days 825 -sha256
-```
-
-### Client Key
-
-```sh
-openssl genrsa -out client.key 2048
-
-openssl req -new -key client.key -out client.csr \
-  -subj "/C=US/O=Refrigeration/OU=Client/CN=Refrigeration Client"
-
-openssl x509 -req -in client.csr -CA ca.pem -CAkey ca.key -CAcreateserial \
-  -out client.crt -days 825 -sha256
-```
-
-This will generate:
-`ca.key`, `ca.pem`, `ca.srl`, `client.crt`, `client.csr`, `client.key`, `server.crt`, `server.csr`, `server.key`
-
-#### Server Files Needed
-
-```sh
-CERT_FILE=/path/to/server.crt
-KEY_FILE=/path/to/server.key
-CA_CERT_FILE=/path/to/ca.pem
-```
-
-#### Client Files Needed
-
-```sh
-client.ca=/path/to/ca.pem
-client.cert=/path/to/client.crt
-client.key=/path/to/client.key
-```
-
----
 
 ## GPIO Pins Used
 

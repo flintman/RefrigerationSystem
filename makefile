@@ -77,16 +77,6 @@ all: deb
 	@echo "--------------------------------------------------------------------------------"
 	@echo "Build completed successfully!"
 
-# Server target
-server: openssl
-	@echo "Building C++ server..."
-	$(MAKE) -C server
-	@echo "Server build completed!"
-
-# Clean server
-server-clean:
-	$(MAKE) -C server clean
-
 # Linking
 $(TARGET): $(OBJS) $(VENDOR_OBJS)
 	@mkdir -p $(BIN_DIR)
@@ -190,12 +180,12 @@ clean:
 	rm -f ./$(DEB_NAME)_$(DEB_VERSION)_$(DEB_ARCH).deb
 
 
-clean-all: clean server-clean
+clean-all: clean
 	rm -rf $(FTXUI_LIB)
 	rm -rf $(OPENSSL_PREFIX)
 	@if [ -d "$(OPENSSL_DIR)" ]; then \
 		$(MAKE) -C $(OPENSSL_DIR) clean || true; \
 	fi
 
-.PHONY: all clean server server-clean openssl clean-all deb ftxui_build
+.PHONY: all clean server openssl clean-all deb ftxui_build
 
