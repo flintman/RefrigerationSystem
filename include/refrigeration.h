@@ -94,7 +94,6 @@ void null_mode();
 void cooling_mode();
 void heating_mode();
 void defrost_mode();
-void display_all_variables();
 void ws8211_system_thread();
 void pretrip_mode();
 void hotspot_start();

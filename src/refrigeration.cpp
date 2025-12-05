@@ -21,25 +21,6 @@
 
 time_t last_log_timestamp = time(nullptr) - 400;
 
-void display_all_variables() {
-    logger.log_events("Debug", "YOU NEED TO RUN 'sudo tech-tool' to initialize the sensors");
-    std::cout << "Logging Interval: " << cfg.get("logging.interval_mins") << " Minutes\n";
-    std::cout << "Log Retention Period: " << cfg.get("logging.retention_period") << " days\n";
-    std::cout << "UNIT Number: " << cfg.get("unit.number") << "\n";
-    std::cout << "Defrost Interval: " << cfg.get("defrost.interval_hours") << " hours\n";
-    std::cout << "Defrost Timeout: " << cfg.get("defrost.timeout_mins") << " minutes\n";
-    std::cout << "Defrost Coil Temperature: " << cfg.get("defrost.coil_temperature") << "°F\n";
-    std::cout << "Temperature Setpoint Offset: " << cfg.get("setpoint.offset") << "°F\n";
-    std::cout << "Compressor Off Timer: " << cfg.get("compressor.off_timer") << " minutes\n";
-    std::cout << "Debug Code: " << cfg.get("debug.code") << "\n";
-    std::cout << "return: " << cfg.get("sensor.return") << "\n";
-    std::cout << "wifi.enable_hotspot: " << cfg.get("wifi.enable_hotspot") << "\n";
-    std::cout << "wifi.hotspot_password: " << cfg.get("wifi.hotspot_password") << "\n";
-    std::cout << "coil: " << cfg.get("sensor.coil") << "\n";
-    std::cout << "supply: " << cfg.get("sensor.supply") << "\n";
-    std::cout << "  HAVE A NICE DAY AND LET ME KNOW IF YOU NEED HELP \n";
-}
-
 void check_sensor_status(float return_temp, float supply_temp, float coil_temp) {
     // Check if any sensor readings are out of bounds
     if (return_temp < -50.0f || return_temp > 150.0f) {
@@ -826,7 +807,6 @@ int main(int argc, char* argv[]) {
 
     try {
         if (cfg.get("sensor.return") == "0") {
-            display_all_variables();
             std::thread hotspot_system(hotspot_start);
             hotspot_system.join();
             running = false; // Stop all threads if any were started elsewhere
