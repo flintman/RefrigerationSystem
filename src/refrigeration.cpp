@@ -19,8 +19,6 @@
 #include <algorithm>
 #include <future>
 
-time_t last_log_timestamp = time(nullptr) - 400;
-
 void check_sensor_status(float return_temp, float supply_temp, float coil_temp) {
     // Check if any sensor readings are out of bounds
     if (return_temp < -50.0f || return_temp > 150.0f) {
@@ -839,8 +837,8 @@ int main(int argc, char* argv[]) {
             std::thread display_system = start_thread(display_system_thread, "display_system_thread");
             std::thread ws8211_system = start_thread(ws8211_system_thread, "ws8211_system_thread");
             std::thread button_system = start_thread(button_system_thread, "button_system_thread");
-            std::thread hotspot_system(hotspot_start); // Hotspot: do not restart
             std::thread alarm_system = start_thread(checkAlarms_system, "alarm_system_thread");
+            std::thread hotspot_system(hotspot_start); // Hotspot: do not restart
 
             refrigeration_thread.join();
             setpoint_thread.join();

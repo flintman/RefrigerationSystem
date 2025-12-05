@@ -21,46 +21,46 @@
 // Version and config
 inline const std::string version = "2.1.0"; //Make sure you update the version in Makefile.
 inline const std::string config_file_name = "/etc/refrigeration/config.env";
+inline ConfigManager cfg(config_file_name);
 
 // Global state and synchronization
 inline std::atomic<bool> running{true};
 inline std::mutex status_mutex;
-
+inline std::atomic_int debug_code{stoi(cfg.get("debug.code"))};
 
 // Managers and hardware
-inline ConfigManager cfg(config_file_name);
 inline GpioManager gpio;
 inline ADS1115 adc;
 inline WS2811Controller ws2811(2, 18);
 inline LCD2004_SMBus display1(0x27);
 inline LCD2004_SMBus display2(0x26);
 inline SensorManager sensors;
-inline Logger logger(stoi(cfg.get("debug.code")));
+inline Logger logger(debug_code.load());
 inline WiFiManager wifi_manager;
 inline Alarm systemAlarm;
 inline DemoRefrigeration demo;
 
 // Alarm state
-inline std::atomic<bool> isShutdownAlarm(false);
-inline std::atomic<bool> isWarningAlarm(false);
+inline std::atomic<bool> isShutdownAlarm{false};
+inline std::atomic<bool> isWarningAlarm{false};
 
 // Refrigeration state
-inline std::atomic<bool> demo_mode(false);
+inline std::atomic<bool> demo_mode{false};
 inline std::atomic<bool> trigger_defrost{false};
-inline std::atomic<bool> pretrip_enable(false);
+inline std::atomic<bool> pretrip_enable{false};
 inline std::atomic<bool> anti_timer{false};
 inline std::atomic<bool> setpointMode {false};
-inline std::atomic<time_t> defrost_start_time = 0;
+inline std::atomic<time_t> defrost_start_time{0};
 inline std::atomic<time_t> defrost_button_press_start_time{0};
 inline std::atomic<time_t> defrost_last_time{time(nullptr)};
 inline std::atomic<time_t> compressor_last_stop_time{time(nullptr) - 400};
 inline std::atomic<time_t> alarm_reset_button_press_start_time{0};
 inline std::atomic<time_t> state_timer{time(nullptr)};
-inline std::atomic<time_t> pretrip_stage_start = 0;
+inline std::atomic<time_t> pretrip_stage_start{0};
 inline std::atomic<int> pretrip_stage{0};
 inline std::atomic<time_t> compressor_on_start_time{0};
 inline std::atomic<long> compressor_on_total_seconds{cfg.get("unit.compressor_run_seconds") == "0" ? 0 : std::stol(cfg.get("unit.compressor_run_seconds"))};
-inline std::string last_compressor_status = "False";
+inline std::string last_compressor_status{"False"};
 inline std::atomic<bool> unit_has_electric_heater{cfg.get("unit.electric_heat") == "1" ? true : false};
 
 
@@ -74,15 +74,15 @@ inline std::map<std::string, std::string> status = {
 };
 
 // Sensor data
-inline std::atomic<float>  return_temp = -327.0f;
-inline std::atomic<float>  supply_temp = -327.0f;
-inline std::atomic<float> coil_temp = -327.0f;
+inline std::atomic<float>  return_temp{-327.0f};
+inline std::atomic<float> supply_temp{-327.0f};
+inline std::atomic<float> coil_temp{-327.0f};
 inline std::atomic<float> setpoint{std::stof(cfg.get("unit.setpoint"))};
 
 // Logging config
-inline int log_retention_period = stoi(cfg.get("logging.retention_period"));
-inline int log_interval = stoi(cfg.get("logging.interval_mins")) * 60; // Convert minutes to seconds
-extern time_t last_log_timestamp;
+inline std::atomic<int> log_retention_period{stoi(cfg.get("logging.retention_period"))};
+inline std::atomic<int> log_interval{stoi(cfg.get("logging.interval_mins")) * 60}; // Convert minutes to seconds
+inline std::atomic<time_t> last_log_timestamp{time(nullptr) - 400};
 
 // Function declarations
 void refrigeration_system(float return_temp_, float supply_temp_, float coil_temp_, float setpoint_);
