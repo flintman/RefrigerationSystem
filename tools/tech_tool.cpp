@@ -45,6 +45,53 @@ static std::string API_BASE_URL;
 static std::string API_HOST;
 static int API_PORT;
 
+// Helper to make API calls and parse JSON response
+nlohmann::json MakeAPICall(const std::string& endpoint, const std::string& api_key) {
+    std::string url = API_BASE_URL + endpoint;
+    std::string cmd = "curl -s -m 3 -H \"X-API-Key:" + api_key + "\" " + url + " 2>&1";
+
+    FILE* pipe = popen(cmd.c_str(), "r");
+    if (!pipe) return nlohmann::json::object();
+
+    std::string result;
+    char buffer[4096];
+    while (fgets(buffer, sizeof(buffer), pipe)) {
+        result += buffer;
+    }
+    pclose(pipe);
+
+    if (result.empty()) return nlohmann::json::object();
+
+    try {
+        return nlohmann::json::parse(result);
+    } catch (...) {
+        return nlohmann::json::object();
+    }
+}
+
+// Helper to make API control calls (POST with data)
+std::string MakeAPIControlCall(const std::string& endpoint, const std::string& api_key) {
+    std::string url = API_BASE_URL + endpoint;
+    std::string cmd = "curl -s -m 3 -X POST -H \"X-API-Key: " + api_key + "\" " + url + " 2>&1";
+
+    FILE* pipe = popen(cmd.c_str(), "r");
+    if (!pipe) return "[Command failed]";
+
+    std::string result;
+    char buffer[512];
+    while (fgets(buffer, sizeof(buffer), pipe)) {
+        result += buffer;
+    }
+    pclose(pipe);
+
+    if (result.empty()) return "[No response]";
+
+    // Trim whitespace
+    result.erase(0, result.find_first_not_of(" \n\r\t"));
+    result.erase(result.find_last_not_of(" \n\r\t") + 1);
+    return result;
+}
+
 // Simple health check using system curl
 std::string CheckAPIHealth(const std::string& api_key) {
     std::string url = API_BASE_URL + "/health";
@@ -450,6 +497,13 @@ int main(int argc, char* argv[]) {
     static int log_scroll = 0;
     static std::vector<std::string> log_lines;
     static std::vector<std::string> temperature_graph;
+    static float current_coil_temp = 0.0f;
+    static float defrost_coil_threshold = 0.0f;
+    static bool has_alarm = false;
+    static std::string current_mode;
+    static std::string control_response;
+    static bool api_is_healthy = false;
+    static nlohmann::json cached_status = nlohmann::json::object();
     if (geteuid() != 0) {
         std::cerr << "This tool must be run as root (sudo).\n";
         return 1;
@@ -472,6 +526,7 @@ int main(int argc, char* argv[]) {
     std::vector<std::string> latestSensorLines;
     std::mutex sensorMutex;
     auto screen = ScreenInteractive::Fullscreen();  // Create screen early for posting events
+
     std::thread polling_thread([&] {
         while (pollingActive) {
             auto lines = sensors.readOneWireTempSensors();
@@ -651,6 +706,35 @@ int main(int argc, char* argv[]) {
                 })
             }) | border | bgcolor(Color::Blue);
 
+            // System status and control block
+            std::vector<Element> status_elems;
+            status_elems.push_back(text("System Status:") | bold | color(Color::White));
+            Color service_color = api_is_healthy ? Color::GreenLight : Color::RedLight;
+            // Use cached status from last refresh
+            std::string service_text = "[Unknown]";
+            if (cached_status.contains("system_status") && cached_status["system_status"].is_string()) {
+                service_text = cached_status["system_status"].get<std::string>();
+            }
+            status_elems.push_back(text("Service: " + service_text) | bold | color(service_color));
+            status_elems.push_back(separator());
+
+            // Show defrost button if service is running
+            if (api_is_healthy) {
+                status_elems.push_back(text("[D] Trigger Defrost") | color(Color::YellowLight) | bold);
+            }
+
+            // Show reset alarm button if service is running
+            if (api_is_healthy && has_alarm) {
+                status_elems.push_back(text("[A] Reset Alarm") | color(Color::RedLight) | bold);
+            }
+
+            if (!control_response.empty()) {
+                status_elems.push_back(separator());
+                status_elems.push_back(text(control_response) | color(Color::White));
+            }
+
+            Element status_block = vbox(status_elems) | border | bgcolor(Color::Blue);
+
             // Temperature graph block
             std::vector<Element> graph_elems;
             graph_elems.push_back(text("Temperature History (Last 6 Hours):") | bold | color(Color::White));
@@ -673,17 +757,26 @@ int main(int argc, char* argv[]) {
             log_elems.push_back(text("↑/↓: Scroll log") | color(Color::White));
             Element log_block = vbox(log_elems) | border | bgcolor(Color::Blue);
 
-            return vbox({
-                text("Refrigeration System - API & Service Dashboard") | bold | color(Color::White) | bgcolor(Color::Blue) | hcenter,
-                separator(),
-                health_block,
-                separator(),
-                service_block,
-                separator(),
-                graph_block,
-                separator(),
-                log_block
-            }) | bgcolor(Color::Blue);
+            // Build dashboard with conditional status block
+            std::vector<Element> dashboard_items;
+            dashboard_items.push_back(text("Refrigeration System - API & Service Dashboard") | bold | color(Color::White) | bgcolor(Color::Blue) | hcenter);
+            dashboard_items.push_back(separator());
+            dashboard_items.push_back(health_block);
+            dashboard_items.push_back(separator());
+            dashboard_items.push_back(service_block);
+
+            // Only show status block if API is healthy
+            if (api_is_healthy) {
+                dashboard_items.push_back(separator());
+                dashboard_items.push_back(status_block);
+            }
+
+            dashboard_items.push_back(separator());
+            dashboard_items.push_back(graph_block);
+            dashboard_items.push_back(separator());
+            dashboard_items.push_back(log_block);
+
+            return vbox(dashboard_items) | bgcolor(Color::Blue);
         } else {
             return vbox({
                 help_panel->Render(),
@@ -713,10 +806,17 @@ int main(int argc, char* argv[]) {
             if (event == Event::Character('r') || event == Event::Character('R')) {
                 dashboard_message = "Checking API health...";
                 dashboard_message = CheckAPIHealth(config.get("api.key"));
+                // Set api_is_healthy based on whether we got a checkmark
+                api_is_healthy = (dashboard_message.find("✓") != std::string::npos);
                 // Refresh log data
                 log_lines = ReadEventsLogFromFile();
                 auto conditions_lines = ReadConditionsLogFromFile();
                 temperature_graph = GenerateTemperatureGraph(conditions_lines, 60, 15);
+                // Refresh system status if API is healthy
+                if (api_is_healthy) {
+                    cached_status = MakeAPICall("/status", config.get("api.key"));
+                }
+                control_response.clear();
                 return true;
             }
             if (event == Event::Character('s') || event == Event::Character('S')) {
@@ -729,6 +829,14 @@ int main(int argc, char* argv[]) {
             }
             if (event == Event::Character('x') || event == Event::Character('X')) {
                 dashboard_message = RunCommandAndGetOutput("sudo systemctl restart refrigeration.service 2>&1");
+                return true;
+            }
+            if (event == Event::Character('d') || event == Event::Character('D')) {
+                control_response = MakeAPIControlCall("/defrost/trigger", config.get("api.key"));
+                return true;
+            }
+            if (event == Event::Character('a') || event == Event::Character('A')) {
+                control_response = MakeAPIControlCall("/alarms/reset", config.get("api.key"));
                 return true;
             }
             // Log scrolling with arrow keys
@@ -791,10 +899,17 @@ int main(int argc, char* argv[]) {
         if (event == Event::Character('m')) {
             // Initialize API health check and load logs
             dashboard_message = CheckAPIHealth(config.get("api.key"));
+            api_is_healthy = (dashboard_message.find("✓") != std::string::npos);
             log_lines = ReadEventsLogFromFile();
             auto conditions_lines = ReadConditionsLogFromFile();
             temperature_graph = GenerateTemperatureGraph(conditions_lines, 60, 15);
+            // Load initial system status if API is healthy
+            if (api_is_healthy) {
+                cached_status = MakeAPICall("/status", config.get("api.key"));
+            }
+
             log_scroll = 0;
+            control_response.clear();
             show_service_dashboard = true;
             return true;
         }
