@@ -56,7 +56,7 @@ VENDOR_OBJS := $(patsubst $(VENDOR_DIR)/%.c, $(OBJ_DIR)/vendor/%.o, $(VENDOR_SRC
 
 # Source and object files for tools
 TOOL_SRCS := $(wildcard $(TOOLS_DIR)/*.cpp)
-TOOL_OBJS := $(patsubst $(TOOLS_DIR)/%.cpp, $(OBJ_DIR)/%.o, $(TOOL_SRCS))
+TOOL_OBJS := $(patsubst $(TOOLS_DIR)/%.cpp, $(OBJ_DIR)/tools_%.o, $(TOOL_SRCS))
 
 ALL_OBJS = $(TOOL_OBJS) $(OBJ_DIR)/config_manager.o $(OBJ_DIR)/config_validator.o $(OBJ_DIR)/sensor_manager.o
 
@@ -95,7 +95,7 @@ $(OBJ_DIR)/%.o: $(SRC_DIR)/%.cpp openssl
 
 
 # Compiling tool C++ files
-$(OBJ_DIR)/%.o: $(TOOLS_DIR)/%.cpp  ftxui_build
+$(OBJ_DIR)/tools_%.o: $(TOOLS_DIR)/%.cpp  ftxui_build
 	@mkdir -p $(@D)
 	$(CXX) $(CXXFLAGS) -Ivendor/FTXUI/include -c $< -o $@
 

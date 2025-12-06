@@ -1,16 +1,22 @@
 /*
- * Refrigeration Server
+ * Refrigeration Server Technician Tool
  * Copyright (c) 2025 William Bellvance Jr
  * Licensed under the MIT License.
  *
  * This project includes third-party software:
  * - OpenSSL (Apache License 2.0)
- * - ws2811 (MIT License)
+ * - FTXUI (MIT License)
  * - nlohmann/json (MIT License)
  */
 
 #include "config_manager.h"
 #include "sensor_manager.h"
+#include "tools/api_client.h"
+#include "tools/system_executor.h"
+#include "tools/log_reader.h"
+#include "tools/temperature_graph.h"
+#include "tools/dashboard_state.h"
+
 #include <ftxui/component/screen_interactive.hpp>
 #include <ftxui/component/component.hpp>
 #include <ftxui/component/component_base.hpp>
@@ -18,6 +24,7 @@
 #include <ftxui/component/event.hpp>
 #include <ftxui/component/captured_mouse.hpp>
 #include <ftxui/component/loop.hpp>
+
 #include <iostream>
 #include <iomanip>
 #include <string>
@@ -26,127 +33,12 @@
 #include <thread>
 #include <atomic>
 #include <limits>
-#include <csignal>
-#include <cstdio>
-#include <cstdlib>
-#include <cstring>
-#include <ctime>
-#include <sys/wait.h>
 #include <chrono>
-#include <sstream>
-#include <algorithm>
-#include <time.h>
-#include <filesystem>
+#include <unistd.h>
 
 using namespace ftxui;
 
-// Global API configuration (initialized after ConfigManager loads)
-static std::string API_BASE_URL;
-static std::string API_HOST;
-static int API_PORT;
-
-// Helper to make API calls and parse JSON response
-nlohmann::json MakeAPICall(const std::string& endpoint, const std::string& api_key) {
-    std::string url = API_BASE_URL + endpoint;
-    std::string cmd = "curl -s -m 3 -H \"X-API-Key:" + api_key + "\" " + url + " 2>&1";
-
-    FILE* pipe = popen(cmd.c_str(), "r");
-    if (!pipe) return nlohmann::json::object();
-
-    std::string result;
-    char buffer[4096];
-    while (fgets(buffer, sizeof(buffer), pipe)) {
-        result += buffer;
-    }
-    pclose(pipe);
-
-    if (result.empty()) return nlohmann::json::object();
-
-    try {
-        return nlohmann::json::parse(result);
-    } catch (...) {
-        return nlohmann::json::object();
-    }
-}
-
-// Helper to make API control calls (POST with data)
-std::string MakeAPIControlCall(const std::string& endpoint, const std::string& api_key) {
-    std::string url = API_BASE_URL + endpoint;
-    std::string cmd = "curl -s -m 3 -X POST -H \"X-API-Key: " + api_key + "\" " + url + " 2>&1";
-
-    FILE* pipe = popen(cmd.c_str(), "r");
-    if (!pipe) return "[Command failed]";
-
-    std::string result;
-    char buffer[512];
-    while (fgets(buffer, sizeof(buffer), pipe)) {
-        result += buffer;
-    }
-    pclose(pipe);
-
-    if (result.empty()) return "[No response]";
-
-    // Trim whitespace
-    result.erase(0, result.find_first_not_of(" \n\r\t"));
-    result.erase(result.find_last_not_of(" \n\r\t") + 1);
-    return result;
-}
-
-// Simple health check using system curl
-std::string CheckAPIHealth(const std::string& api_key) {
-    std::string url = API_BASE_URL + "/health";
-    std::string cmd = "curl -s -m 3 -H \"X-API-Key:" + api_key + "\" " + url + " 2>&1";
-
-    FILE* pipe = popen(cmd.c_str(), "r");
-    if (!pipe) return "[✗ API Error]";
-
-    std::string result;
-    char buffer[512];
-    while (fgets(buffer, sizeof(buffer), pipe)) {
-        result += buffer;
-    }
-    pclose(pipe);
-
-    if (result.empty()) {
-        return "[✗ No Response]";
-    }
-
-    // Trim whitespace
-    result.erase(0, result.find_first_not_of(" \n\r\t"));
-    result.erase(result.find_last_not_of(" \n\r\t") + 1);
-
-    // Check if response contains JSON status
-    if (result.find("\"status\":\"ok\"") != std::string::npos) {
-        // Extract timestamp if present
-        size_t ts_pos = result.find("\"timestamp\":");
-        if (ts_pos != std::string::npos) {
-            ts_pos += 12;  // Length of "\"timestamp\":"
-            size_t ts_end = result.find(",", ts_pos);
-            if (ts_end == std::string::npos) {
-                ts_end = result.find("}", ts_pos);
-            }
-            if (ts_end != std::string::npos) {
-                std::string timestamp_str = result.substr(ts_pos, ts_end - ts_pos);
-                // Trim whitespace
-                timestamp_str.erase(0, timestamp_str.find_first_not_of(" \n\r\t"));
-                timestamp_str.erase(timestamp_str.find_last_not_of(" \n\r\t") + 1);
-
-                try {
-                    time_t unix_time = std::stol(timestamp_str);
-                    struct tm* tm_info = localtime(&unix_time);
-                    char formatted[32];
-                    strftime(formatted, sizeof(formatted), "%m/%d/%Y  %H:%M:%S", tm_info);
-                    return "[✓ API Running] " + std::string(formatted);
-                } catch (...) {
-                    return "[✓ API Running]";
-                }
-            }
-        }
-        return "[✓ API Running]";
-    } else {
-        return "[✗ API Error]";
-    }
-}struct AppState {
+struct AppState {
     ConfigManager manager;
     SensorManager sensors;
     std::vector<std::string> latestSensorLines;
@@ -178,332 +70,7 @@ void StopSensorPolling(AppState& state) {
     state.polling1stfetch = false;
 }
 
-// Helper to kill refrigeration process
-int KillRefrigerationProcess() {
-    // Step 1: Try graceful systemctl stop
-    system("sudo systemctl stop refrigeration.service 2>/dev/null");
-    std::this_thread::sleep_for(std::chrono::seconds(1));
-
-    // Step 2: Send SIGTERM to any remaining processes
-    system("pkill -TERM refrigeration 2>/dev/null");
-    std::this_thread::sleep_for(std::chrono::milliseconds(500));
-
-    // Step 3: Force kill any stragglers with SIGKILL
-    system("pkill -KILL refrigeration 2>/dev/null");
-    std::this_thread::sleep_for(std::chrono::milliseconds(200));
-
-    // Step 4: Verify all processes are gone
-    int retries = 10;
-    while (retries-- > 0) {
-        int result = system("pgrep -x refrigeration >/dev/null 2>&1");
-        if (result != 0) {
-            // Process not found (pgrep returns non-zero when no matches)
-            return 1;  // Successfully killed
-        }
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
-    }
-
-    return 0;  // Could not verify all processes killed
-}
-
-std::string RunCommandAndGetOutput(const std::string& cmd) {
-    std::string result;
-    FILE* pipe = popen(cmd.c_str(), "r");
-    if (!pipe) return "[Failed to run command]";
-    char buffer[256];
-    while (fgets(buffer, sizeof(buffer), pipe)) {
-        result += buffer;
-    }
-    pclose(pipe);
-    return result;
-}
-
-// Helper to get today's date string in YYYY-MM-DD format
-std::string GetTodaysDateString() {
-    auto now = std::time(nullptr);
-    auto tm = *std::localtime(&now);
-    char buffer[32];
-    std::strftime(buffer, sizeof(buffer), "%Y-%m-%d", &tm);
-    return std::string(buffer);
-}
-
-// Helper to get today's events log file path (for fallback)
-std::string GetTodaysEventLogPath() {
-    auto now = std::time(nullptr);
-    auto tm = *std::localtime(&now);
-    char buffer[32];
-    std::strftime(buffer, sizeof(buffer), "%Y-%m-%d", &tm);
-    return std::string("/var/log/refrigeration/events-") + buffer + ".log";
-}
-
-// Helper to read events log file (read-only stream if service active) - FALLBACK
-std::vector<std::string> ReadEventsLogFromFile() {
-    std::string log_path = GetTodaysEventLogPath();
-    std::string lock_file = log_path + ".lock";
-    std::vector<std::string> lines;
-
-    // Wait intelligently for any ongoing writes to complete
-    int max_wait_cycles = 20;  // ~200ms total with 10ms sleeps
-    for (int wait = 0; wait < max_wait_cycles; ++wait) {
-        // Check if lock file exists (writer is active)
-        if (!std::filesystem::exists(lock_file)) {
-            break;  // Lock released, safe to read
-        }
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));
-    }
-
-    FILE* file = fopen(log_path.c_str(), "r");
-    if (!file) {
-        lines.push_back("[Log file not found: " + log_path + "]");
-        return lines;
-    }
-    char buffer[512];
-    while (fgets(buffer, sizeof(buffer), file)) {
-        size_t len = strlen(buffer);
-        if (len > 0 && buffer[len-1] == '\n') {
-            buffer[len-1] = '\0';
-        }
-        lines.push_back(buffer);
-    }
-    fclose(file);
-    return lines;
-}
-
-// Structure to hold condition data point
-struct ConditionDataPoint {
-    time_t timestamp;
-    float setpoint;
-    float return_sensor;
-    float coil_sensor;
-    float supply;
-};
-
-// Parse a conditions log line
-bool ParseConditionLine(const std::string& line, ConditionDataPoint& point) {
-    // Format: 2025-12-02 06:07:23 - Setpoint: 55.000000, Return Sensor: 61.799999, Coil Sensor: 60.700001, Supply: 62.900002, ...
-    std::istringstream iss(line);
-    std::string date, time_str, dash;
-    if (!(iss >> date >> time_str >> dash)) return false;
-
-    struct tm tm_info = {};
-    if (!strptime((date + " " + time_str).c_str(), "%Y-%m-%d %H:%M:%S", &tm_info)) return false;
-    point.timestamp = mktime(&tm_info);
-
-    std::string token;
-    while (std::getline(iss, token, ',')) {
-        size_t colon_pos = token.find(':');
-        if (colon_pos == std::string::npos) continue;
-
-        std::string key = token.substr(0, colon_pos);
-        std::string value_str = token.substr(colon_pos + 1);
-
-        // Trim whitespace
-        key.erase(0, key.find_first_not_of(" "));
-        key.erase(key.find_last_not_of(" ") + 1);
-        value_str.erase(0, value_str.find_first_not_of(" "));
-        value_str.erase(value_str.find_last_not_of(" ") + 1);
-
-        try {
-            if (key == "Setpoint") point.setpoint = std::stof(value_str);
-            else if (key == "Return Sensor") point.return_sensor = std::stof(value_str);
-            else if (key == "Coil Sensor") point.coil_sensor = std::stof(value_str);
-            else if (key == "Supply") point.supply = std::stof(value_str);
-        } catch (...) { }
-    }
-    return true;
-}
-
-// Read conditions log file and filter to last 6 hours - FALLBACK VERSION
-std::vector<ConditionDataPoint> ReadConditionsLogFromFile() {
-    std::string log_path = "/var/log/refrigeration/conditions-";
-    auto now = std::time(nullptr);
-    auto tm = *std::localtime(&now);
-    char buffer[32];
-    std::strftime(buffer, sizeof(buffer), "%Y-%m-%d", &tm);
-    log_path += std::string(buffer) + ".log";
-    std::string lock_file = log_path + ".lock";
-
-    std::vector<ConditionDataPoint> data;
-
-    // Wait for any ongoing writes to complete
-    int max_wait_cycles = 20;  // ~200ms total with 10ms sleeps
-    for (int wait = 0; wait < max_wait_cycles; ++wait) {
-        // Check if lock file exists (writer is active)
-        if (!std::filesystem::exists(lock_file)) {
-            break;  // Lock released, safe to read
-        }
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));
-    }
-
-    // Try to open file with retries
-    FILE* file = nullptr;
-    int max_retries = 3;
-    for (int i = 0; i < max_retries; ++i) {
-        file = fopen(log_path.c_str(), "r");
-        if (file) break;
-        if (i < max_retries - 1) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(50));
-        }
-    }
-
-    if (!file)
-        return data;
-    char line_buf[512];
-    time_t six_hours_ago = now - (6 * 3600);
-
-    while (fgets(line_buf, sizeof(line_buf), file)) {
-        std::string line(line_buf);
-        if (!line.empty() && line.back() == '\n') line.pop_back();
-
-        ConditionDataPoint point = {};
-        if (ParseConditionLine(line, point) && point.timestamp >= six_hours_ago) {
-            data.push_back(point);
-        }
-    }
-    fclose(file);
-    return data;
-}
-
-// Generate ASCII graph of temperature data
-std::vector<std::string> GenerateTemperatureGraph(const std::vector<ConditionDataPoint>& data, int width = 80, int height = 10) {
-    std::vector<std::string> graph;
-
-    if (data.empty()) {
-        graph.push_back("[No data available for the last 6 hours]");
-        return graph;
-    }
-
-    try {
-        // Find min/max temperatures with safety checks
-        float min_temp = 0.0f, max_temp = 0.0f;
-        bool first = true;
-
-        for (const auto& point : data) {
-            // Skip invalid data points
-            if (std::isnan(point.setpoint) || std::isnan(point.return_sensor) ||
-                std::isnan(point.coil_sensor) || std::isnan(point.supply)) {
-                continue;
-            }
-
-            float min_val = std::min({point.setpoint, point.return_sensor, point.coil_sensor, point.supply});
-            float max_val = std::max({point.setpoint, point.return_sensor, point.coil_sensor, point.supply});
-
-            if (first) {
-                min_temp = min_val;
-                max_temp = max_val;
-                first = false;
-            } else {
-                min_temp = std::min(min_temp, min_val);
-                max_temp = std::max(max_temp, max_val);
-            }
-        }
-
-        // Add some padding
-        float range = max_temp - min_temp;
-        if (range < 1.0f) range = 1.0f;
-        min_temp -= range * 0.05f;
-        max_temp += range * 0.05f;
-
-        // Sample data points to fit width
-        std::vector<ConditionDataPoint> sampled;
-        if (data.size() <= (size_t)width) {
-            sampled = data;
-        } else {
-            int step = std::max(1, (int)data.size() / width);
-            for (size_t i = 0; i < data.size(); i += step) {
-                sampled.push_back(data[i]);
-            }
-            if (!sampled.empty() && sampled.back().timestamp != data.back().timestamp) {
-                sampled.push_back(data.back());
-            }
-        }
-
-        // Ensure we have valid data
-        if (sampled.empty()) {
-            graph.push_back("[No valid temperature data]");
-            return graph;
-        }
-
-        // Ensure width doesn't exceed sampled data
-        int graph_width = std::min((int)sampled.size(), width);
-
-        // Normalize and create graph
-        std::vector<std::vector<char>> grid(height, std::vector<char>(graph_width, ' '));
-
-        for (int x = 0; x < graph_width && x < (int)sampled.size(); ++x) {
-            const auto& point = sampled[x];
-
-            // Skip invalid points
-            if (std::isnan(point.setpoint) && std::isnan(point.return_sensor) &&
-                std::isnan(point.coil_sensor) && std::isnan(point.supply)) {
-                continue;
-            }
-
-            // Plot all 4 temperature values
-            auto plot_temp = [&](float temp, char symbol) {
-                if (std::isnan(temp) || temp < min_temp || temp > max_temp) return;
-                int y = height - 1 - (int)((temp - min_temp) / (max_temp - min_temp + 0.001f) * (height - 1));
-                y = std::max(0, std::min(height - 1, y));
-                if (x >= 0 && x < graph_width && y >= 0 && y < height) {
-                    if (grid[y][x] == ' ') grid[y][x] = symbol;
-                }
-            };
-            plot_temp(point.setpoint, 'S');       // Setpoint
-            plot_temp(point.return_sensor, 'R');  // Return sensor
-            plot_temp(point.coil_sensor, 'C');    // Coil sensor
-            plot_temp(point.supply, 'P');         // suPply
-        }
-
-        // Format as strings
-        char y_label[16];
-        for (int y = 0; y < height; ++y) {
-            float temp = max_temp - (float)y / (height - 1) * (max_temp - min_temp);
-            snprintf(y_label, sizeof(y_label), "%5.1f|", temp);
-            std::string row(y_label);
-            for (int x = 0; x < graph_width && x < (int)grid[y].size(); ++x) {
-                row += grid[y][x];
-            }
-            graph.push_back(row);
-        }
-
-        // Add legend and time range
-        graph.push_back("      +" + std::string(graph_width, '-'));
-        graph.push_back("Legend: S=Setpoint, R=Return, C=Coil, P=Supply");
-
-        if (!data.empty()) {
-            auto first_tm = *std::localtime(&data.front().timestamp);
-            auto last_tm = *std::localtime(&data.back().timestamp);
-            char time_range[128];
-            snprintf(time_range, sizeof(time_range), "Time range: %02d:%02d - %02d:%02d",
-                    first_tm.tm_hour, first_tm.tm_min, last_tm.tm_hour, last_tm.tm_min);
-            graph.push_back(time_range);
-        }
-
-    } catch (const std::exception& e) {
-        graph.clear();
-        graph.push_back(std::string("[Error generating graph: ") + e.what() + "]");
-    } catch (...) {
-        graph.clear();
-        graph.push_back("[Unknown error generating graph]");
-    }
-
-    return graph;
-}
-
 int main(int argc, char* argv[]) {
-    // Refrigeration service dashboard state
-    static bool show_service_dashboard = false;
-    static std::string dashboard_message;
-    static int log_scroll = 0;
-    static std::vector<std::string> log_lines;
-    static std::vector<std::string> temperature_graph;
-    static float current_coil_temp = 0.0f;
-    static float defrost_coil_threshold = 0.0f;
-    static bool has_alarm = false;
-    static std::string current_mode;
-    static std::string control_response;
-    static bool api_is_healthy = false;
-    static nlohmann::json cached_status = nlohmann::json::object();
     if (geteuid() != 0) {
         std::cerr << "This tool must be run as root (sudo).\n";
         return 1;
@@ -521,11 +88,27 @@ int main(int argc, char* argv[]) {
         argv[1] = const_cast<char*>(defaultConfig);
     }
 
+    ConfigManager config(argv[1]);
+
+    // Initialize API client
+    std::string api_port_str = config.get("api.port");
+    int api_port = 8095;
+    try {
+        api_port = std::stoi(api_port_str);
+    } catch (...) {
+        api_port = 8095;
+    }
+
+    APIClient api_client("localhost", api_port, config.get("api.key"));
+    SystemCommandExecutor system_executor;
+    LogReader log_reader;
+    DashboardState dashboard_state;
+
     SensorManager sensors;
     std::atomic<bool> pollingActive{true};
     std::vector<std::string> latestSensorLines;
     std::mutex sensorMutex;
-    auto screen = ScreenInteractive::Fullscreen();  // Create screen early for posting events
+    auto screen = ScreenInteractive::Fullscreen();
 
     std::thread polling_thread([&] {
         while (pollingActive) {
@@ -534,46 +117,36 @@ int main(int argc, char* argv[]) {
                 std::lock_guard<std::mutex> lock(sensorMutex);
                 latestSensorLines = std::move(lines);
             }
-            screen.PostEvent(Event::Custom);  // Force UI refresh when sensors update
+            screen.PostEvent(Event::Custom);
             std::this_thread::sleep_for(std::chrono::seconds(2));
         }
     });
 
-    ConfigManager config(argv[1]);
-
-    // Initialize API configuration from config
-    std::string api_port_str = config.get("api.port");
-    try {
-        API_PORT = std::stoi(api_port_str);
-    } catch (...) {
-        API_PORT = 8095;  // Default fallback
-    }
-    API_BASE_URL = "http://" + std::string("localhost") + ":" + api_port_str + "/api/v1";
-
     auto schema = config.getSchema();
     int selected = 0;
-    int config_scroll = 0;  // Scroll offset for config table
+    int config_scroll = 0;
     std::string edit_value;
     enum class Mode { View, Edit };
     Mode mode = Mode::View;
     std::string status_message;
+    bool awaiting_confirmation = false;
+    std::string confirmation_prompt;
+
     Component config_table = Renderer([&] {
         std::vector<Element> rows;
         std::vector<std::string> keys;
         for (const auto& [key, _] : schema) keys.push_back(key);
 
-        const int config_height = 20;  // Visible height
+        const int config_height = 20;
         int total_configs = keys.size();
         int max_scroll = std::max(0, total_configs - config_height);
 
-        // Adjust scroll if selected is out of view
         if (selected < config_scroll) {
             config_scroll = selected;
         } else if (selected >= config_scroll + config_height) {
             config_scroll = selected - config_height + 1;
         }
 
-        // Clamp scroll to valid range
         config_scroll = std::max(0, std::min(config_scroll, max_scroll));
 
         if (schema.empty()) {
@@ -603,7 +176,6 @@ int main(int argc, char* argv[]) {
 
             if (mode == Mode::Edit && !keys.empty()) {
                 std::string value = config.get(keys[selected]);
-                // Blinking cursor logic
                 static auto last_blink = std::chrono::steady_clock::now();
                 static bool cursor_on = true;
                 auto now = std::chrono::steady_clock::now();
@@ -613,11 +185,10 @@ int main(int argc, char* argv[]) {
                 }
                 std::string display_value = edit_value.empty() ? value : edit_value;
                 if (cursor_on) {
-                    display_value += "\u2588"; // Unicode full block as cursor
+                    display_value += "\u2588";
                 } else {
                     display_value += " ";
                 }
-                // Update the row in the visible list if it's the selected one
                 int vis_idx = selected - config_scroll;
                 if (vis_idx >= 0 && vis_idx < (int)rows.size()) {
                     rows[vis_idx] = hbox({
@@ -657,10 +228,11 @@ int main(int argc, char* argv[]) {
 
     Component status_bar = Renderer([&] {
         std::string mode_str = (mode == Mode::Edit) ? "[EDIT MODE]" : "[VIEW MODE]";
+        std::string display_msg = awaiting_confirmation ? confirmation_prompt : status_message;
         return hbox({
             text(mode_str) | bold | color(mode == Mode::Edit ? Color::RedLight : Color::GreenLight) | bgcolor(Color::Black),
             text("  "),
-            text(status_message) | color(Color::White) | bgcolor(Color::Black)
+            text(display_msg) | color(Color::White) | bgcolor(Color::Black)
         }) | hcenter | bgcolor(Color::Black);
     });
 
@@ -681,13 +253,14 @@ int main(int argc, char* argv[]) {
             text("Tip: Sensor data updates live. Config changes are saved instantly.") | color(Color::White),
         }) | border | bgcolor(Color::Blue);
     });
+
     Component main_container = CatchEvent(Renderer([&] {
-        if (show_service_dashboard) {
+        if (dashboard_state.show_service_dashboard) {
             // API Health Status block
-            Color api_status_color = dashboard_message.find("✓") != std::string::npos ? Color::GreenLight : Color::RedLight;
+            Color api_status_color = dashboard_state.dashboard_message.find("✓") != std::string::npos ? Color::GreenLight : Color::RedLight;
             Element health_block = vbox({
                 text("API Health Check:") | bold | color(Color::White),
-                text(dashboard_message) | bold | color(api_status_color),
+                text(dashboard_state.dashboard_message) | bold | color(api_status_color),
                 separator(),
                 hbox({
                     text("[R] Refresh Health  ") | color(Color::YellowLight) | bold,
@@ -709,28 +282,26 @@ int main(int argc, char* argv[]) {
             // System status and control block
             std::vector<Element> status_elems;
             status_elems.push_back(text("System Status:") | bold | color(Color::White));
-            Color service_color = api_is_healthy ? Color::GreenLight : Color::RedLight;
-            // Use cached status from last refresh
+            Color service_color = dashboard_state.api_is_healthy ? Color::GreenLight : Color::RedLight;
             std::string service_text = "[Unknown]";
-            if (cached_status.contains("system_status") && cached_status["system_status"].is_string()) {
-                service_text = cached_status["system_status"].get<std::string>();
+            if (dashboard_state.cached_status.contains("system_status") &&
+                dashboard_state.cached_status["system_status"].is_string()) {
+                service_text = dashboard_state.cached_status["system_status"].get<std::string>();
             }
             status_elems.push_back(text("Service: " + service_text) | bold | color(service_color));
             status_elems.push_back(separator());
 
-            // Show defrost button if service is running
-            if (api_is_healthy) {
+            if (dashboard_state.api_is_healthy) {
                 status_elems.push_back(text("[D] Trigger Defrost") | color(Color::YellowLight) | bold);
             }
 
-            // Show reset alarm button if service is running
-            if (api_is_healthy && has_alarm) {
+            if (dashboard_state.api_is_healthy && dashboard_state.has_alarm) {
                 status_elems.push_back(text("[A] Reset Alarm") | color(Color::RedLight) | bold);
             }
 
-            if (!control_response.empty()) {
+            if (!dashboard_state.control_response.empty()) {
                 status_elems.push_back(separator());
-                status_elems.push_back(text(control_response) | color(Color::White));
+                status_elems.push_back(text(dashboard_state.control_response) | color(Color::White));
             }
 
             Element status_block = vbox(status_elems) | border | bgcolor(Color::Blue);
@@ -738,20 +309,20 @@ int main(int argc, char* argv[]) {
             // Temperature graph block
             std::vector<Element> graph_elems;
             graph_elems.push_back(text("Temperature History (Last 6 Hours):") | bold | color(Color::White));
-            for (const auto& graph_line : temperature_graph) {
+            for (const auto& graph_line : dashboard_state.temperature_graph) {
                 graph_elems.push_back(text(graph_line) | color(Color::White));
             }
             Element graph_block = vbox(graph_elems) | border | bgcolor(Color::Blue);
 
             // Event log block (scrollable)
             int log_height = 8;
-            int total_lines = log_lines.size();
-            int start_line = std::max(0, total_lines - log_height - log_scroll);
+            int total_lines = dashboard_state.log_lines.size();
+            int start_line = std::max(0, total_lines - log_height - dashboard_state.log_scroll);
             int end_line = std::min(total_lines, start_line + log_height);
             std::vector<Element> log_elems;
             log_elems.push_back(text("Recent Event Logs:") | bold | color(Color::White));
             for (int i = start_line; i < end_line; ++i) {
-                log_elems.push_back(text(log_lines[i]) | color(Color::White));
+                log_elems.push_back(text(dashboard_state.log_lines[i]) | color(Color::White));
             }
             log_elems.push_back(separator());
             log_elems.push_back(text("↑/↓: Scroll log") | color(Color::White));
@@ -765,8 +336,7 @@ int main(int argc, char* argv[]) {
             dashboard_items.push_back(separator());
             dashboard_items.push_back(service_block);
 
-            // Only show status block if API is healthy
-            if (api_is_healthy) {
+            if (dashboard_state.api_is_healthy) {
                 dashboard_items.push_back(separator());
                 dashboard_items.push_back(status_block);
             }
@@ -795,69 +365,61 @@ int main(int argc, char* argv[]) {
         for (const auto& [key, _] : schema) keys.push_back(key);
         static bool editing_line = false;
 
-        // Always handle service dashboard events first
-        if (show_service_dashboard) {
-            // Service dashboard event handling
+        if (dashboard_state.show_service_dashboard) {
             if (event == Event::Character('q') || event == Event::Character('Q') || event == Event::Escape) {
-                show_service_dashboard = false;
-                dashboard_message.clear();
+                dashboard_state.show_service_dashboard = false;
+                dashboard_state.dashboard_message.clear();
                 return true;
             }
             if (event == Event::Character('r') || event == Event::Character('R')) {
-                dashboard_message = "Checking API health...";
-                dashboard_message = CheckAPIHealth(config.get("api.key"));
-                // Set api_is_healthy based on whether we got a checkmark
-                api_is_healthy = (dashboard_message.find("✓") != std::string::npos);
-                // Refresh log data
-                log_lines = ReadEventsLogFromFile();
-                auto conditions_lines = ReadConditionsLogFromFile();
-                temperature_graph = GenerateTemperatureGraph(conditions_lines, 60, 15);
-                // Refresh system status if API is healthy
-                if (api_is_healthy) {
-                    cached_status = MakeAPICall("/status", config.get("api.key"));
+                dashboard_state.dashboard_message = "Checking API health...";
+                dashboard_state.UpdateHealthStatus(api_client.CheckHealth());
+                dashboard_state.log_lines = log_reader.ReadEventsLog();
+                auto condition_data = TemperatureGraphGenerator::ReadLast6Hours();
+                dashboard_state.temperature_graph = TemperatureGraphGenerator::GenerateGraph(condition_data, 60, 15);
+                if (dashboard_state.api_is_healthy) {
+                    dashboard_state.cached_status = api_client.GetStatus("/status");
                 }
-                control_response.clear();
+                dashboard_state.control_response.clear();
                 return true;
             }
             if (event == Event::Character('s') || event == Event::Character('S')) {
-                dashboard_message = RunCommandAndGetOutput("sudo systemctl start refrigeration.service 2>&1");
+                dashboard_state.dashboard_message = system_executor.StartService();
                 return true;
             }
             if (event == Event::Character('t') || event == Event::Character('T')) {
-                dashboard_message = RunCommandAndGetOutput("sudo systemctl stop refrigeration.service 2>&1");
+                dashboard_state.dashboard_message = system_executor.StopService();
                 return true;
             }
             if (event == Event::Character('x') || event == Event::Character('X')) {
-                dashboard_message = RunCommandAndGetOutput("sudo systemctl restart refrigeration.service 2>&1");
+                dashboard_state.dashboard_message = system_executor.RestartService();
                 return true;
             }
             if (event == Event::Character('d') || event == Event::Character('D')) {
-                control_response = MakeAPIControlCall("/defrost/trigger", config.get("api.key"));
+                dashboard_state.control_response = api_client.PostControl("/defrost/trigger");
                 return true;
             }
             if (event == Event::Character('a') || event == Event::Character('A')) {
-                control_response = MakeAPIControlCall("/alarms/reset", config.get("api.key"));
+                dashboard_state.control_response = api_client.PostControl("/alarms/reset");
                 return true;
             }
-            // Log scrolling with arrow keys
             if (event == Event::ArrowUp) {
-                if (log_scroll < (int)log_lines.size() - 8) log_scroll++;
+                if (dashboard_state.log_scroll < (int)dashboard_state.log_lines.size() - 8)
+                    dashboard_state.log_scroll++;
                 return true;
             }
             if (event == Event::ArrowDown) {
-                if (log_scroll > 0) log_scroll--;
+                if (dashboard_state.log_scroll > 0) dashboard_state.log_scroll--;
                 return true;
             }
             return false;
         }
-        // Main dashboard and edit mode logic follows
+
         if (mode == Mode::Edit) {
-            // Block service dashboard in edit mode
             if (event == Event::Character('m')) {
                 status_message = "Service dashboard only available in VIEW MODE.";
                 return true;
             }
-            // In edit mode, navigation
             if (event == Event::ArrowDown) {
                 int sz = schema.size();
                 if (selected + 1 < sz) selected++;
@@ -867,21 +429,84 @@ int main(int argc, char* argv[]) {
                 if (selected > 0) selected--;
                 return true;
             }
-            // Capital E toggles back to view mode
+            // Handle confirmation prompt during edit mode
+            if (awaiting_confirmation) {
+                if (event == Event::Character('y') || event == Event::Character('Y')) {
+                    // User confirmed - reset to default
+                    if (!keys.empty() && selected < (int)keys.size()) {
+                        config.set(keys[selected], schema.at(keys[selected]).defaultValue);
+                        status_message = "Reset to default: " + schema.at(keys[selected]).defaultValue;
+                    }
+                    awaiting_confirmation = false;
+                    confirmation_prompt.clear();
+                    return true;
+                } else if (event == Event::Character('n') || event == Event::Character('N')) {
+                    // User declined confirmation
+                    awaiting_confirmation = false;
+                    confirmation_prompt.clear();
+                    status_message = "Cancelled.";
+                    return true;
+                }
+                return false;  // Ignore other keys during confirmation
+            }
+
+            // Edit mode: 'e' to edit value
+            if (event == Event::Character('e')) {
+                edit_value.clear();
+                editing_line = true;
+                status_message = "Editing " + ((!keys.empty() && selected < (int)keys.size()) ? keys[selected] : "value") + ": Type new value, press Enter to save, Backspace to delete";
+                return true;
+            }
+            // Edit mode: 'd' to reset to default
+            if (event == Event::Character('d')) {
+                if (!keys.empty() && selected < (int)keys.size()) {
+                    awaiting_confirmation = true;
+                    confirmation_prompt = "Reset " + keys[selected] + " to default? (y/n)";
+                }
+                return true;
+            }
+            // Handle text input when editing
+            if (editing_line) {
+                if (event == Event::Character('\n') || event == Event::Character('\r')) {
+                    // Enter - save the value
+                    if (!keys.empty() && selected < (int)keys.size() && !edit_value.empty()) {
+                        config.set(keys[selected], edit_value);
+                        status_message = "Saved: " + edit_value;
+                    } else if (edit_value.empty()) {
+                        status_message = "Empty value, not saved.";
+                    }
+                    edit_value.clear();
+                    editing_line = false;
+                    return true;
+                } else if (event == Event::Character('\b')) {
+                    // Backspace - delete last character
+                    if (!edit_value.empty()) {
+                        edit_value.pop_back();
+                    }
+                    return true;
+                } else {
+                    // Try to handle printable ASCII characters
+                    for (char c = 32; c < 127; c++) {
+                        if (event == Event::Character(c)) {
+                            edit_value.push_back(c);
+                            return true;
+                        }
+                    }
+                }
+            }
             if (event == Event::Character('E') || event == Event::Escape || event == Event::Character('q')) {
                 mode = Mode::View;
                 edit_value.clear();
+                editing_line = false;
                 status_message = "Returned to VIEW MODE.";
                 return true;
             }
             return false;
         } else {
-            // VIEW MODE: allow entering edit mode with capital E
             if (event == Event::Character('E')) {
                 status_message = "Stopping refrigeration service... Please wait.";
-                // Spawn thread to kill process while UI refreshes
                 std::thread kill_thread([&]() {
-                    KillRefrigerationProcess();
+                    system_executor.KillRefrigerationProcess();
                     std::this_thread::sleep_for(std::chrono::milliseconds(500));
                     mode = Mode::Edit;
                     status_message = "Refrigeration service stopped. Entered EDIT MODE. Press E/q/Esc to exit.";
@@ -889,28 +514,24 @@ int main(int argc, char* argv[]) {
                 kill_thread.detach();
                 return true;
             }
-            // VIEW MODE: allow quitting with 'q'
             if (event == Event::Character('q')) {
                 screen.Exit();
                 return true;
             }
         }
-        // View mode
+
         if (event == Event::Character('m')) {
-            // Initialize API health check and load logs
-            dashboard_message = CheckAPIHealth(config.get("api.key"));
-            api_is_healthy = (dashboard_message.find("✓") != std::string::npos);
-            log_lines = ReadEventsLogFromFile();
-            auto conditions_lines = ReadConditionsLogFromFile();
-            temperature_graph = GenerateTemperatureGraph(conditions_lines, 60, 15);
-            // Load initial system status if API is healthy
-            if (api_is_healthy) {
-                cached_status = MakeAPICall("/status", config.get("api.key"));
+            dashboard_state.UpdateHealthStatus(api_client.CheckHealth());
+            dashboard_state.log_lines = log_reader.ReadEventsLog();
+            auto condition_data = TemperatureGraphGenerator::ReadLast6Hours();
+            dashboard_state.temperature_graph = TemperatureGraphGenerator::GenerateGraph(condition_data, 60, 15);
+            if (dashboard_state.api_is_healthy) {
+                dashboard_state.cached_status = api_client.GetStatus("/status");
             }
 
-            log_scroll = 0;
-            control_response.clear();
-            show_service_dashboard = true;
+            dashboard_state.log_scroll = 0;
+            dashboard_state.control_response.clear();
+            dashboard_state.show_service_dashboard = true;
             return true;
         }
         return false;
