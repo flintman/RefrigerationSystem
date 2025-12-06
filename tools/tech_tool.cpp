@@ -312,7 +312,6 @@ int main(int argc, char* argv[]) {
 
             // Display relay status
             if (dashboard_state.cached_status.contains("relays") && dashboard_state.cached_status["relays"].is_object()) {
-                status_elems.push_back(separator());
                 auto relays = dashboard_state.cached_status["relays"];
                 std::vector<Element> relay_line;
                 relay_line.push_back(text("Relays: ") | bold | color(Color::White));
@@ -345,7 +344,6 @@ int main(int argc, char* argv[]) {
 
             // Display sensor readings
             if (dashboard_state.cached_status.contains("sensors") && dashboard_state.cached_status["sensors"].is_object()) {
-                status_elems.push_back(separator());
                 auto sensors = dashboard_state.cached_status["sensors"];
                 std::vector<Element> sensor_line;
                 sensor_line.push_back(text("Sensors (°F): ") | bold | color(Color::White));
@@ -374,7 +372,7 @@ int main(int argc, char* argv[]) {
                     color(Color::YellowLight) | bold);
             }
 
-            status_elems.push_back(separator());
+            status_elems.push_back(text("Controls:") | bold | color(Color::White));
             if (dashboard_state.api_is_healthy &&
                 dashboard_state.cached_status.contains("sensors") &&
                 dashboard_state.cached_status["sensors"].contains("coil_temp") &&
@@ -388,7 +386,7 @@ int main(int argc, char* argv[]) {
                     defrost_temp = 0.0f;
                 }
                 if (coil_temp < defrost_temp) {
-                    status_elems.push_back(text("[D] Trigger Defrost") | color(Color::YellowLight) | bold);
+                    status_elems.push_back(text("[F] Trigger Defrost") | color(Color::YellowLight) | bold);
                 }
             }
 
@@ -410,11 +408,11 @@ int main(int argc, char* argv[]) {
 
             // Temperature data table block
             std::vector<Element> graph_elems;
-            graph_elems.push_back(text("Temperature History (Last 6 Hours) - Use [ ] to scroll:") | bold | color(Color::White));
+            graph_elems.push_back(text("Temp History (Last 6h) [ ]") | bold | color(Color::White));
 
             // Regenerate table with current scroll position
             auto temp_condition_data = TemperatureDataTable::ReadLast6Hours();
-            auto temp_table = TemperatureDataTable::FormatAsTable(temp_condition_data, 6, dashboard_state.temp_data_scroll);
+            auto temp_table = TemperatureDataTable::FormatAsTable(temp_condition_data, 4, dashboard_state.temp_data_scroll);
 
             for (const auto& table_line : temp_table) {
                 graph_elems.push_back(text(table_line) | color(Color::White));
@@ -422,17 +420,16 @@ int main(int argc, char* argv[]) {
             Element graph_block = vbox(graph_elems) | border | bgcolor(Color::Blue);
 
             // Event log block (scrollable)
-            int log_height = 8;
+            int log_height = 4;
             int total_lines = dashboard_state.log_lines.size();
             int start_line = std::max(0, total_lines - log_height - dashboard_state.log_scroll);
             int end_line = std::min(total_lines, start_line + log_height);
             std::vector<Element> log_elems;
-            log_elems.push_back(text("Recent Event Logs:") | bold | color(Color::White));
+            log_elems.push_back(text("Event Logs:") | bold | color(Color::White));
             for (int i = start_line; i < end_line; ++i) {
                 log_elems.push_back(text(dashboard_state.log_lines[i]) | color(Color::White));
             }
-            log_elems.push_back(separator());
-            log_elems.push_back(text("↑/↓: Scroll log") | color(Color::White));
+            log_elems.push_back(text("↑/↓: Scroll") | color(Color::White));
             Element log_block = vbox(log_elems) | border | bgcolor(Color::Blue);
 
             // Build dashboard with conditional status block
@@ -442,9 +439,9 @@ int main(int argc, char* argv[]) {
 
             // Health check and service controls side-by-side
             dashboard_items.push_back(hbox({
-                health_block,
+                health_block | flex,
                 separatorEmpty(),
-                service_block
+                service_block | flex
             }) | flex);
 
             dashboard_items.push_back(separator());
@@ -452,10 +449,10 @@ int main(int argc, char* argv[]) {
             // System status and temperature graph side-by-side
             if (dashboard_state.api_is_healthy) {
                 dashboard_items.push_back(hbox({
-                    status_block | flex,
+                    status_block,
                     separatorEmpty(),
-                    graph_block | flex
-                }));
+                    graph_block
+                }) | flex);
                 dashboard_items.push_back(separator());
             }
 
@@ -464,7 +461,7 @@ int main(int argc, char* argv[]) {
             return vbox({
                 tab_header->Render(),
                 separator(),
-                vbox(dashboard_items) | bgcolor(Color::Blue)
+                vbox(dashboard_items) | bgcolor(Color::Blue) | flex
             }) | bgcolor(Color::Blue);
         } else {
             return vbox({
