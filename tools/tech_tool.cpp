@@ -391,6 +391,11 @@ int main(int argc, char* argv[]) {
 
             if (dashboard_state.api_is_healthy && dashboard_state.has_alarm) {
                 status_elems.push_back(text("[A] Reset Alarm") | color(Color::RedLight) | bold);
+            } else if (dashboard_state.api_is_healthy &&
+                       dashboard_state.cached_status.contains("system_status") &&
+                       dashboard_state.cached_status["system_status"].is_string() &&
+                       dashboard_state.cached_status["system_status"].get<std::string>() == "Alarm") {
+                status_elems.push_back(text("[A] Reset Alarm") | color(Color::RedLight) | bold);
             }
 
             if (!dashboard_state.control_response.empty()) {
@@ -403,11 +408,11 @@ int main(int argc, char* argv[]) {
             // Temperature data table block
             std::vector<Element> graph_elems;
             graph_elems.push_back(text("Temperature History (Last 6 Hours) - Use [ ] to scroll:") | bold | color(Color::White));
-            
+
             // Regenerate table with current scroll position
             auto temp_condition_data = TemperatureDataTable::ReadLast6Hours();
             auto temp_table = TemperatureDataTable::FormatAsTable(temp_condition_data, 6, dashboard_state.temp_data_scroll);
-            
+
             for (const auto& table_line : temp_table) {
                 graph_elems.push_back(text(table_line) | color(Color::White));
             }
