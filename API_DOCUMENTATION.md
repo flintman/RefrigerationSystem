@@ -227,7 +227,58 @@ Manually trigger a defrost cycle, if coil temperature is below defrost setpoint.
 
 ---
 
-### 9. System Information
+### 9. Demo Mode Control
+
+#### POST `/api/v1/demo-mode`
+Enable or disable demo mode. When demo mode is enabled, the system uses simulated temperature data instead of reading from real sensors.
+
+**Request Body:**
+```json
+{
+  "enable": true
+}
+```
+
+**Response (200 OK):**
+```json
+{
+  "success": true,
+  "message": "Demo mode enabled",
+  "demo_mode": true,
+  "previous_state": false,
+  "timestamp": 1764953832
+}
+```
+
+**Fields:**
+- `enable`: Boolean - true to enable demo mode, false to disable
+- `demo_mode`: Current demo mode state after update
+- `previous_state`: Demo mode state before the update
+
+**Error Response (400 Bad Request):**
+```json
+{
+  "error": "Missing or invalid 'enable' boolean field"
+}
+```
+
+#### GET `/api/v1/demo-mode`
+Get the current demo mode status.
+
+**Response (200 OK):**
+```json
+{
+  "demo_mode": true,
+  "timestamp": 1764953832
+}
+```
+
+**Fields:**
+- `demo_mode`: Boolean indicating if demo mode is currently enabled
+
+---
+
+### 10. System Information
 
 #### GET `/api/v1/system-info`
 Get comprehensive system configuration and status information.
@@ -298,7 +349,7 @@ Alarm status:
 
 ---
 
-### 10. Update Configuration
+### 11. Update Configuration
 
 #### POST `/api/v1/config`
 Update one or more configuration items.
@@ -388,7 +439,7 @@ All configuration items except:
 
 ---
 
-### 11. Download Events Log
+### 12. Download Events Log
 
 #### GET `/api/v1/logs/events?date=YYYY-MM-DD`
 Download the events log file for a specific date.
@@ -428,7 +479,7 @@ Connection: close
 
 ---
 
-### 11. Download Conditions Log
+### 13. Download Conditions Log
 
 #### GET `/api/v1/logs/conditions?date=YYYY-MM-DD`
 Download the conditions log file for a specific date.
@@ -560,6 +611,30 @@ curl -X POST \
   -H "Content-Type: application/json" \
   -d '{"defrost.interval_hours": "10", "setpoint.high_limit": "85", "wifi.hotspot_password": "newpassword"}' \
   http://xxx.xxx.xxx.xxx:8095/api/v1/config
+```
+
+### Enable Demo Mode
+```bash
+curl -X POST \
+  -H "X-API-Key:refrigeration-api-default-key-change-me" \
+  -H "Content-Type: application/json" \
+  -d '{"enable": true}' \
+  http://xxx.xxx.xxx.xxx:8095/api/v1/demo-mode
+```
+
+### Disable Demo Mode
+```bash
+curl -X POST \
+  -H "X-API-Key:refrigeration-api-default-key-change-me" \
+  -H "Content-Type: application/json" \
+  -d '{"enable": false}' \
+  http://xxx.xxx.xxx.xxx:8095/api/v1/demo-mode
+```
+
+### Get Current Demo Mode Status
+```bash
+curl -H "X-API-Key:refrigeration-api-default-key-change-me" \
+  http://xxx.xxx.xxx.xxx:8095/api/v1/demo-mode
 ```
 
 ### Download Events Log

@@ -32,6 +32,7 @@ extern std::atomic<float> setpoint;
 extern std::map<std::string, std::string> status;
 extern std::mutex status_mutex;
 extern bool trigger_defrost;
+extern std::atomic<bool> demo_mode;
 
 extern Alarm systemAlarm;  // Forward declare global alarm system
 
@@ -433,6 +434,32 @@ json RefrigerationAPI::handle_defrost_trigger_request() {
     return response;
 }
 
+json RefrigerationAPI::handle_demo_mode_request(bool enable) {
+    json response;
+
+    try {
+        bool old_mode = demo_mode.load();
+        demo_mode.store(enable);
+        response["success"] = true;
+        response["message"] = enable ? "Demo mode enabled" : "Demo mode disabled";
+        response["demo_mode"] = enable;
+        response["previous_state"] = old_mode;
+        response["timestamp"] = std::time(nullptr);
+
+        if (logger_) {
+            logger_->log_events("Debug", "API: Demo mode " + std::string(enable ? "enabled" : "disabled"));
+        }
+    } catch (const std::exception& e) {
+        response["error"] = true;
+        response["message"] = e.what();
+        if (logger_) {
+            logger_->log_events("Error", "API: Demo mode change failed - " + std::string(e.what()));
+        }
+    }
+
+    return response;
+}
+
 json RefrigerationAPI::handle_system_info_request() {
     json info;
 
@@ -807,6 +834,25 @@ void RefrigerationAPI::start() {
             }
             else if (path == "/api/v1/defrost/trigger" && method == "POST") {
                 response_json = handle_defrost_trigger_request();
+            }
+            else if (path == "/api/v1/demo-mode" && method == "POST") {
+                try {
+                    json body_json = json::parse(body);
+                    if (body_json.contains("enable") && body_json["enable"].is_boolean()) {
+                        bool enable = body_json["enable"].get<bool>();
+                        response_json = handle_demo_mode_request(enable);
+                    } else {
+                        http_code = 400;
+                        response_json["error"] = "Missing or invalid 'enable' boolean field";
+                    }
+                } catch (const std::exception& e) {
+                    http_code = 400;
+                    response_json["error"] = "Invalid JSON body";
+                }
+            }
+            else if (path == "/api/v1/demo-mode" && method == "GET") {
+                response_json["demo_mode"] = demo_mode.load();
+                response_json["timestamp"] = std::time(nullptr);
             }
             // System info
             else if (path == "/api/v1/system-info") {

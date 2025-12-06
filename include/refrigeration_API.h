@@ -63,6 +63,7 @@ private:
     json handle_setpoint_set_request(float new_setpoint);
     json handle_alarm_reset_request();
     json handle_defrost_trigger_request();
+    json handle_demo_mode_request(bool enable);
     json handle_system_info_request();
     json handle_config_update_request(const json& config_updates);
     std::string handle_download_events_request(const std::string& date);
