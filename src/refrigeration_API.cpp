@@ -7,6 +7,7 @@
 #include "refrigeration_API.h"
 #include "config_manager.h"
 #include "config_validator.h"
+#include "alarm.h"
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -32,17 +33,7 @@ extern std::map<std::string, std::string> status;
 extern std::mutex status_mutex;
 extern bool trigger_defrost;
 
-// Alarm system forward declaration
-class AlarmSystem {
-public:
-    virtual void resetAlarm() = 0;
-    virtual std::vector<int> getAlarmCodes() const = 0;
-    virtual bool getWarningStatus() const = 0;
-    virtual bool getShutdownStatus() const = 0;
-    virtual ~AlarmSystem() = default;
-};
-
-extern AlarmSystem* systemAlarm;  // Forward declare global alarm system
+extern Alarm systemAlarm;  // Forward declare global alarm system
 
 // Simple HTTP Server implementation
 class HTTPServer {
@@ -397,9 +388,10 @@ json RefrigerationAPI::handle_alarm_reset_request() {
     }
 
     try {
-        if (systemAlarm) {
-            systemAlarm->resetAlarm();
-        }
+        systemAlarm.resetAlarm();
+        // Sleep briefly to allow the alarm reset to take effect
+        std::this_thread::sleep_for(std::chrono::milliseconds(200));
+
         response["success"] = true;
         response["message"] = "Alarms reset successfully";
         response["timestamp"] = std::time(nullptr);
@@ -477,20 +469,16 @@ json RefrigerationAPI::handle_system_info_request() {
         info["wifi.hotspot_password"] = config.get("wifi.hotspot_password");
 
         // Get alarm codes if alarm system is available
-        if (systemAlarm) {
-            auto codes = systemAlarm->getAlarmCodes();
+        {
+            auto codes = systemAlarm.getAlarmCodes();
             info["active_alarms"] = codes;
-            info["alarm_warning"] = systemAlarm->getWarningStatus();
-            info["alarm_shutdown"] = systemAlarm->getShutdownStatus();
+            info["alarm_warning"] = systemAlarm.getWarningStatus();
+            info["alarm_shutdown"] = systemAlarm.getShutdownStatus();
 
             if (logger_) {
                 logger_->log_events("Debug", "API: System info - Unit: " + info["unit.number"].get<std::string>() +
                                   ", Active alarms: " + std::to_string(codes.size()));
             }
-        } else {
-            info["active_alarms"] = json::array();
-            info["alarm_warning"] = false;
-            info["alarm_shutdown"] = false;
         }
 
         info["timestamp"] = std::time(nullptr);
