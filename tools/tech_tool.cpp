@@ -280,7 +280,7 @@ int main(int argc, char* argv[]) {
                 text(dashboard_state.dashboard_message) | bold | color(api_status_color),
                 separator(),
                 hbox({
-                    text("[R] Refresh Health  ") | color(Color::YellowLight) | bold,
+                    text("[R] Refresh Page  ") | color(Color::YellowLight) | bold,
                     text("[Q] Quit dashboard") | color(Color::White) | bold
                 })
             }) | border | bgcolor(Color::Blue);
@@ -306,10 +306,87 @@ int main(int argc, char* argv[]) {
                 service_text = dashboard_state.cached_status["system_status"].get<std::string>();
             }
             status_elems.push_back(text("Service: " + service_text) | bold | color(service_color));
-            status_elems.push_back(separator());
 
-            if (dashboard_state.api_is_healthy) {
-                status_elems.push_back(text("[D] Trigger Defrost") | color(Color::YellowLight) | bold);
+            // Display relay status
+            if (dashboard_state.cached_status.contains("relays") && dashboard_state.cached_status["relays"].is_object()) {
+                status_elems.push_back(separator());
+                auto relays = dashboard_state.cached_status["relays"];
+                std::vector<Element> relay_line;
+                relay_line.push_back(text("Relays: ") | bold | color(Color::White));
+
+                if (relays.contains("compressor")) {
+                    bool comp = relays["compressor"].get<bool>();
+                    relay_line.push_back(text("Comp:" + std::string(comp ? "ON" : "OFF")) |
+                        color(comp ? Color::GreenLight : Color::RedLight));
+                    relay_line.push_back(text(" "));
+                }
+                if (relays.contains("fan")) {
+                    bool fan = relays["fan"].get<bool>();
+                    relay_line.push_back(text("Fan:" + std::string(fan ? "ON" : "OFF")) |
+                        color(fan ? Color::GreenLight : Color::RedLight));
+                    relay_line.push_back(text(" "));
+                }
+                if (relays.contains("valve")) {
+                    bool valve = relays["valve"].get<bool>();
+                    relay_line.push_back(text("Valve:" + std::string(valve ? "ON" : "OFF")) |
+                        color(valve ? Color::GreenLight : Color::RedLight));
+                    relay_line.push_back(text(" "));
+                }
+                if (relays.contains("electric_heater")) {
+                    bool heater = relays["electric_heater"].get<bool>();
+                    relay_line.push_back(text("Heat:" + std::string(heater ? "ON" : "OFF")) |
+                        color(heater ? Color::GreenLight : Color::RedLight));
+                }
+                status_elems.push_back(hbox(relay_line));
+            }
+
+            // Display sensor readings
+            if (dashboard_state.cached_status.contains("sensors") && dashboard_state.cached_status["sensors"].is_object()) {
+                status_elems.push_back(separator());
+                auto sensors = dashboard_state.cached_status["sensors"];
+                std::vector<Element> sensor_line;
+                sensor_line.push_back(text("Sensors (°F): ") | bold | color(Color::White));
+
+                if (sensors.contains("return_temp")) {
+                    float rt = sensors["return_temp"].get<float>();
+                    sensor_line.push_back(text("Ret:" + std::to_string(rt).substr(0, 5)) | color(Color::YellowLight));
+                    sensor_line.push_back(text(" "));
+                }
+                if (sensors.contains("supply_temp")) {
+                    float st = sensors["supply_temp"].get<float>();
+                    sensor_line.push_back(text("Sup:" + std::to_string(st).substr(0, 5)) | color(Color::YellowLight));
+                    sensor_line.push_back(text(" "));
+                }
+                if (sensors.contains("coil_temp")) {
+                    float ct = sensors["coil_temp"].get<float>();
+                    sensor_line.push_back(text("Coil:" + std::to_string(ct).substr(0, 5)) | color(Color::YellowLight));
+                }
+                status_elems.push_back(hbox(sensor_line));
+            }
+
+            // Display setpoint
+            if (dashboard_state.cached_status.contains("setpoint")) {
+                float sp = dashboard_state.cached_status["setpoint"].get<float>();
+                status_elems.push_back(text("Setpoint: " + std::to_string(sp).substr(0, 5) + "°F") |
+                    color(Color::YellowLight) | bold);
+            }
+
+            status_elems.push_back(separator());
+            if (dashboard_state.api_is_healthy &&
+                dashboard_state.cached_status.contains("sensors") &&
+                dashboard_state.cached_status["sensors"].contains("coil_temp") &&
+                schema.find("defrost.coil_temperature") != schema.end())
+            {
+                float coil_temp = dashboard_state.cached_status["sensors"]["coil_temp"].get<float>();
+                float defrost_temp = 0.0f;
+                try {
+                    defrost_temp = std::stof(config.get("defrost.coil_temperature"));
+                } catch (...) {
+                    defrost_temp = 0.0f;
+                }
+                if (coil_temp < defrost_temp) {
+                    status_elems.push_back(text("[D] Trigger Defrost") | color(Color::YellowLight) | bold);
+                }
             }
 
             if (dashboard_state.api_is_healthy && dashboard_state.has_alarm) {
@@ -349,18 +426,26 @@ int main(int argc, char* argv[]) {
             std::vector<Element> dashboard_items;
             dashboard_items.push_back(text("Refrigeration System - API & Service Dashboard") | bold | color(Color::White) | bgcolor(Color::Blue) | hcenter);
             dashboard_items.push_back(separator());
-            dashboard_items.push_back(health_block);
-            dashboard_items.push_back(separator());
-            dashboard_items.push_back(service_block);
 
+            // Health check and service controls side-by-side
+            dashboard_items.push_back(hbox({
+                health_block,
+                separatorEmpty(),
+                service_block
+            }) | flex);
+
+            dashboard_items.push_back(separator());
+
+            // System status and temperature graph side-by-side
             if (dashboard_state.api_is_healthy) {
+                dashboard_items.push_back(hbox({
+                    status_block | flex,
+                    separatorEmpty(),
+                    graph_block | flex
+                }));
                 dashboard_items.push_back(separator());
-                dashboard_items.push_back(status_block);
             }
 
-            dashboard_items.push_back(separator());
-            dashboard_items.push_back(graph_block);
-            dashboard_items.push_back(separator());
             dashboard_items.push_back(log_block);
 
             return vbox({
@@ -372,14 +457,15 @@ int main(int argc, char* argv[]) {
             return vbox({
                 tab_header->Render(),
                 separator(),
-                help_panel->Render(),
+                hbox({
+                    help_panel->Render() | flex,
+                    separatorEmpty(),
+                    sensor_panel->Render() | flex
+                }),
+                separator(),
                 status_bar->Render(),
                 separatorEmpty(),
-                hbox({
-                    config_table->Render(),
-                    separatorEmpty(),
-                    sensor_panel->Render()
-                }),
+                config_table->Render(),
                 separatorEmpty()
             }) | bgcolor(Color::Black);
         }
