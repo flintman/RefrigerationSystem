@@ -1,4 +1,42 @@
 # Version Log
+## 2.5.0
+- **e182182b**: tech-tool – Show how to move around in the temperature data.
+- **ae3c2b8b**: tech-tool – Update so q exits no matter what tab you're on.
+- **6ca36033**: tech-tool – More display adjustments.
+- **cac43bc7**: tech-tool – Add demo mode to tech tool.
+- **3b284a57**: api – Add demo mode.
+- **2d9bb457**: api – Fixup reset alarm.
+- **1d125c01**: tech-tool – Fix up not showing reset alarm.
+- **fdaa6c6b**: tech-tool – Drop the graphic for a table.
+- **cef5a786**: tech-tool – Adjust the layout and add more info.
+- **c50f0289**: tech-tool – Switch over to tabs.
+- **0fb0b10b**: tech-tool – This is getting bigger, need to break it down.
+- **8f0766f8**: tech-tool – Add in defrost and reset alarm.
+- **aa4bb79f**: tech-tool – Update to use the api.
+- **83f020d0**: API – Add in an API since we are dumping the server/client.
+- **69989975**: cleanup – Clean up code and make a little more consistent.
+- **ebe9f59e**: config – Drop displaying configs if there is an issue.
+- **a1ef3642**: server – Drop it and also drop the client.
+- **ade5834b**: server – Was getting lockups from outside IP address.
+- **2cb8899e**: tech-tool – Kill process.
+- **3b6725dd**: buttons – Fix a race condition causing 100% CPU.
+- **8a94981d**: tech-tool – Give the service update a little more time.
+- **0115b6ea**: setpoint – Hit alarm button to save vs holding up and down.
+- **e81806cb**: logs – Move some of the outputs to pass through the log system.
+- **c8020d84**: logs – Send conditional data to debug if enabled.
+- **9248c31f**: alarm – Don't send if not allowed to send.
+- **31f51b19**: tech-tool – Don't upgrade the screen so much.
+- **19f9986e**: tech-tool – Implement file locking.
+- **3cc45788**: log_manager – Implement POSIX File Locking on files.
+- **b7834565**: tech-tool – Add in a crude graph to track the temps for 6 hours.
+- **672abd57**: tech-tool – Read the log files.
+- **6d59d047**: tech-tool – Clean up code.
+- **20ade2c5**: tech-tool – When editing sensors you can scroll the available ones.
+- **76f93195**: tech-tool – Move the status message under the navigation menu.
+- **a2ec5cb7**: tech-tool – Sensors, make so they update quicker rather than hanging.
+- **a9ab6af2**: tech-tool – Scroll the config menu in edit.
+- **5f5e28bd**: tech-tool – Update to stop the service running to edit config.
+- **3c25296f**: readme – Add license info for FTXUI.
 ## 2.1.0
 - **05d1130f**: readme – Update with new way of building, simpler.
 - **be96a08f**: FTXUI – Add in and compile for PI.

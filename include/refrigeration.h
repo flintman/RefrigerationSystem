@@ -20,7 +20,7 @@
 #include "refrigeration_API.h"
 
 // Version and config
-inline const std::string version = "2.1.0"; //Make sure you update the version in Makefile.
+inline const std::string version = "2.5.0"; //Make sure you update the version in Makefile.
 inline const std::string config_file_name = "/etc/refrigeration/config.env";
 inline ConfigManager cfg(config_file_name);
 
