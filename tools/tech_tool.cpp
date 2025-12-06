@@ -508,8 +508,7 @@ int main(int argc, char* argv[]) {
 
         if (current_tab == TabPage::Dashboard) {
             if (event == Event::Character('q') || event == Event::Character('Q') || event == Event::Escape) {
-                current_tab = TabPage::Config;
-                dashboard_state.dashboard_message.clear();
+                screen.Exit();
                 return true;
             }
             if (event == Event::Character('r') || event == Event::Character('R')) {
@@ -661,7 +660,7 @@ int main(int argc, char* argv[]) {
                     }
                 }
             }
-            if (event == Event::Character('E') || event == Event::Escape || event == Event::Character('q')) {
+            if (event == Event::Character('E') || event == Event::Escape ) {
                 mode = Mode::View;
                 edit_value.clear();
                 editing_line = false;
@@ -683,7 +682,7 @@ int main(int argc, char* argv[]) {
             }
             if (event == Event::Character('q')) {
                 screen.Exit();
-                return true;
+                return true;  // Already handled above for Dashboard tab
             }
         }
 
