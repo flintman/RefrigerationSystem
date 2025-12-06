@@ -132,6 +132,10 @@ int main(int argc, char* argv[]) {
     bool awaiting_confirmation = false;
     std::string confirmation_prompt;
 
+    // Tab system
+    enum class TabPage { Config, Dashboard };
+    TabPage current_tab = TabPage::Config;
+
     Component config_table = Renderer([&] {
         std::vector<Element> rows;
         std::vector<std::string> keys;
@@ -241,21 +245,34 @@ int main(int argc, char* argv[]) {
             text("Refrigeration System Technician Tool") | bold | color(Color::White) | bgcolor(Color::Blue),
             separator(),
             text("Navigation:") | bold | color(Color::White),
+            text("  Tab: Switch between tabs (Config / Dashboard)") | color(Color::YellowLight),
             text("  ↑/↓  Up/Down arrows: Move selection") | color(Color::White),
             text("  E: Toggle EDIT/VIEW MODE (shuts down refrigeration, allows editing)") | color(Color::YellowLight),
             text("  e: Edit selected value (in EDIT MODE only)") | color(Color::YellowLight),
             text("  d: Reset to default (in EDIT MODE only)") | color(Color::YellowLight),
             text("  Enter: Save edit") | color(Color::GreenLight),
             text("  Esc: Cancel edit or quit") | color(Color::RedLight),
-            text("  m: Service dashboard") | color(Color::White),
             text("  q: Quit") | color(Color::RedLight),
             separator(),
             text("Tip: Sensor data updates live. Config changes are saved instantly.") | color(Color::White),
         }) | border | bgcolor(Color::Blue);
     });
 
+    Component tab_header = Renderer([&] {
+        Element config_tab = text(" Config Editor ") | bold |
+            (current_tab == TabPage::Config ? bgcolor(Color::GreenLight) | color(Color::Black) : bgcolor(Color::GrayDark));
+        Element dashboard_tab = text(" Dashboard ") | bold |
+            (current_tab == TabPage::Dashboard ? bgcolor(Color::GreenLight) | color(Color::Black) : bgcolor(Color::GrayDark));
+
+        return hbox({
+            config_tab,
+            text(" | ") | color(Color::White),
+            dashboard_tab
+        }) | bgcolor(Color::Blue) | hcenter;
+    });
+
     Component main_container = CatchEvent(Renderer([&] {
-        if (dashboard_state.show_service_dashboard) {
+        if (current_tab == TabPage::Dashboard) {
             // API Health Status block
             Color api_status_color = dashboard_state.dashboard_message.find("✓") != std::string::npos ? Color::GreenLight : Color::RedLight;
             Element health_block = vbox({
@@ -346,9 +363,15 @@ int main(int argc, char* argv[]) {
             dashboard_items.push_back(separator());
             dashboard_items.push_back(log_block);
 
-            return vbox(dashboard_items) | bgcolor(Color::Blue);
+            return vbox({
+                tab_header->Render(),
+                separator(),
+                vbox(dashboard_items) | bgcolor(Color::Blue)
+            }) | bgcolor(Color::Blue);
         } else {
             return vbox({
+                tab_header->Render(),
+                separator(),
                 help_panel->Render(),
                 status_bar->Render(),
                 separatorEmpty(),
@@ -365,9 +388,31 @@ int main(int argc, char* argv[]) {
         for (const auto& [key, _] : schema) keys.push_back(key);
         static bool editing_line = false;
 
-        if (dashboard_state.show_service_dashboard) {
+        // Tab key to switch between tabs (not allowed in Edit mode)
+        if (event == Event::Tab) {
+            if (mode == Mode::Edit) {
+                status_message = "Cannot switch tabs in EDIT MODE. Press E to exit first.";
+                return true;
+            }
+            if (current_tab == TabPage::Config) {
+                current_tab = TabPage::Dashboard;
+                dashboard_state.dashboard_message = "Switching to Dashboard...";
+                dashboard_state.UpdateHealthStatus(api_client.CheckHealth());
+                dashboard_state.log_lines = log_reader.ReadEventsLog();
+                auto condition_data = TemperatureGraphGenerator::ReadLast6Hours();
+                dashboard_state.temperature_graph = TemperatureGraphGenerator::GenerateGraph(condition_data, 60, 15);
+                if (dashboard_state.api_is_healthy) {
+                    dashboard_state.cached_status = api_client.GetStatus("/status");
+                }
+            } else {
+                current_tab = TabPage::Config;
+            }
+            return true;
+        }
+
+        if (current_tab == TabPage::Dashboard) {
             if (event == Event::Character('q') || event == Event::Character('Q') || event == Event::Escape) {
-                dashboard_state.show_service_dashboard = false;
+                current_tab = TabPage::Config;
                 dashboard_state.dashboard_message.clear();
                 return true;
             }
@@ -520,20 +565,6 @@ int main(int argc, char* argv[]) {
             }
         }
 
-        if (event == Event::Character('m')) {
-            dashboard_state.UpdateHealthStatus(api_client.CheckHealth());
-            dashboard_state.log_lines = log_reader.ReadEventsLog();
-            auto condition_data = TemperatureGraphGenerator::ReadLast6Hours();
-            dashboard_state.temperature_graph = TemperatureGraphGenerator::GenerateGraph(condition_data, 60, 15);
-            if (dashboard_state.api_is_healthy) {
-                dashboard_state.cached_status = api_client.GetStatus("/status");
-            }
-
-            dashboard_state.log_scroll = 0;
-            dashboard_state.control_response.clear();
-            dashboard_state.show_service_dashboard = true;
-            return true;
-        }
         return false;
     });
 
