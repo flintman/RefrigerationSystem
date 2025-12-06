@@ -34,6 +34,18 @@ public:
     std::string PostControl(const std::string& endpoint);
 
     /**
+     * Set demo mode on/off
+     * Returns JSON response with status
+     */
+    nlohmann::json SetDemoMode(bool enable);
+
+    /**
+     * Get current demo mode status
+     * Returns JSON response with demo_mode boolean
+     */
+    nlohmann::json GetDemoMode();
+
+    /**
      * Set the API key for authentication
      */
     void SetAPIKey(const std::string& api_key);

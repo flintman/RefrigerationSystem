@@ -293,10 +293,13 @@ int main(int argc, char* argv[]) {
                     text("[S] Start  ") | color(Color::GreenLight) | bold,
                     text("[T] Stop  ") | color(Color::RedLight) | bold,
                     text("[X] Restart") | color(Color::YellowLight) | bold
+                }),
+                hbox({
+                    text("[D] Demo: ") | bold | color(Color::White),
+                    text(dashboard_state.demo_mode ? "ON " : "OFF") |
+                        color(dashboard_state.demo_mode ? Color::CyanLight : Color::GreenLight) | bold
                 })
-            }) | border | bgcolor(Color::Blue);
-
-            // System status and control block
+            }) | border | bgcolor(Color::Blue);            // System status and control block
             std::vector<Element> status_elems;
             status_elems.push_back(text("System Status:") | bold | color(Color::White));
             Color service_color = dashboard_state.api_is_healthy ? Color::GreenLight : Color::RedLight;
@@ -537,6 +540,17 @@ int main(int argc, char* argv[]) {
                 return true;
             }
             if (event == Event::Character('d') || event == Event::Character('D')) {
+                // Toggle demo mode
+                dashboard_state.demo_mode = !dashboard_state.demo_mode;
+                auto response = api_client.SetDemoMode(dashboard_state.demo_mode);
+                if (response.contains("success") && response["success"].is_boolean()) {
+                    dashboard_state.control_response = dashboard_state.demo_mode ? "Demo mode ENABLED" : "Demo mode DISABLED";
+                } else {
+                    dashboard_state.control_response = "Failed to toggle demo mode";
+                }
+                return true;
+            }
+            if (event == Event::Character('f') || event == Event::Character('F')) {
                 dashboard_state.control_response = api_client.PostControl("/defrost/trigger");
                 return true;
             }

@@ -17,6 +17,7 @@ public:
     std::string dashboard_message;
     bool api_is_healthy;
     nlohmann::json cached_status;
+    bool demo_mode;
 
     // Log display
     int log_scroll;

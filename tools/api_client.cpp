@@ -98,3 +98,40 @@ nlohmann::json APIClient::GetStatus(const std::string& endpoint) {
 std::string APIClient::PostControl(const std::string& endpoint) {
     return ExecuteCurl("POST", endpoint);
 }
+
+nlohmann::json APIClient::SetDemoMode(bool enable) {
+    std::string url = api_base_url + "/demo-mode";
+    std::string json_data = enable ? "{\"enable\": true}" : "{\"enable\": false}";
+    std::string cmd = "curl -s -m 3 -X POST -H \"X-API-Key: " + api_key + "\" " +
+                      "-H \"Content-Type: application/json\" " +
+                      "-d '" + json_data + "' " + url + " 2>&1";
+
+    FILE* pipe = popen(cmd.c_str(), "r");
+    if (!pipe) return nlohmann::json::object();
+
+    std::string result;
+    char buffer[4096];
+    while (fgets(buffer, sizeof(buffer), pipe)) {
+        result += buffer;
+    }
+    pclose(pipe);
+
+    if (result.empty()) {
+        return nlohmann::json::object();
+    }
+
+    // Trim whitespace
+    result.erase(0, result.find_first_not_of(" \n\r\t"));
+    result.erase(result.find_last_not_of(" \n\r\t") + 1);
+
+    try {
+        return nlohmann::json::parse(result);
+    } catch (...) {
+        return nlohmann::json::object();
+    }
+}
+
+nlohmann::json APIClient::GetDemoMode() {
+    return GetStatus("/demo-mode");
+}
+

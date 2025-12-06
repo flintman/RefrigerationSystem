@@ -3,6 +3,7 @@
 DashboardState::DashboardState()
     : show_service_dashboard(false),
       api_is_healthy(false),
+      demo_mode(false),
       log_scroll(0),
       temp_data_scroll(0),
       current_coil_temp(0.0f),
@@ -15,6 +16,7 @@ void DashboardState::Reset() {
     show_service_dashboard = false;
     dashboard_message.clear();
     api_is_healthy = false;
+    demo_mode = false;
     cached_status = nlohmann::json::object();
     log_scroll = 0;
     temp_data_scroll = 0;
