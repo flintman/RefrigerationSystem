@@ -22,6 +22,7 @@ public:
     int log_scroll;
     std::vector<std::string> log_lines;
     std::vector<std::string> temperature_graph;
+    int temp_data_scroll;  // Scroll position for temperature data table
 
     // System status
     float current_coil_temp;

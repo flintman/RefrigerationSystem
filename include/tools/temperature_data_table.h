@@ -16,21 +16,21 @@ struct ConditionDataPoint {
 };
 
 /**
- * TemperatureGraphGenerator creates ASCII temperature graphs from condition data
+ * TemperatureDataTable reads temperature/condition data and formats it as an Excel-style table
  */
-class TemperatureGraphGenerator {
+class TemperatureDataTable {
 public:
     /**
-     * Generate ASCII temperature graph from condition data points
+     * Generate Excel-style table from condition data points
      * @param data Vector of condition data points
-     * @param width Graph width in characters (default 80)
-     * @param height Graph height in lines (default 10)
-     * @return Vector of strings representing the graph
+     * @param height Number of rows to display (default 6)
+     * @param scroll_offset Starting row offset for scrolling
+     * @return Vector of strings representing the table
      */
-    static std::vector<std::string> GenerateGraph(
+    static std::vector<std::string> FormatAsTable(
         const std::vector<ConditionDataPoint>& data,
-        int width = 80,
-        int height = 10
+        int height = 6,
+        int scroll_offset = 0
     );
 
     /**

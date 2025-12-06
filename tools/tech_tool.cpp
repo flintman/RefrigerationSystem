@@ -14,7 +14,7 @@
 #include "tools/api_client.h"
 #include "tools/system_executor.h"
 #include "tools/log_reader.h"
-#include "tools/temperature_graph.h"
+#include "tools/temperature_data_table.h"
 #include "tools/dashboard_state.h"
 
 #include <ftxui/component/screen_interactive.hpp>
@@ -400,11 +400,16 @@ int main(int argc, char* argv[]) {
 
             Element status_block = vbox(status_elems) | border | bgcolor(Color::Blue);
 
-            // Temperature graph block
+            // Temperature data table block
             std::vector<Element> graph_elems;
-            graph_elems.push_back(text("Temperature History (Last 6 Hours):") | bold | color(Color::White));
-            for (const auto& graph_line : dashboard_state.temperature_graph) {
-                graph_elems.push_back(text(graph_line) | color(Color::White));
+            graph_elems.push_back(text("Temperature History (Last 6 Hours) - Use [ ] to scroll:") | bold | color(Color::White));
+            
+            // Regenerate table with current scroll position
+            auto temp_condition_data = TemperatureDataTable::ReadLast6Hours();
+            auto temp_table = TemperatureDataTable::FormatAsTable(temp_condition_data, 6, dashboard_state.temp_data_scroll);
+            
+            for (const auto& table_line : temp_table) {
+                graph_elems.push_back(text(table_line) | color(Color::White));
             }
             Element graph_block = vbox(graph_elems) | border | bgcolor(Color::Blue);
 
@@ -485,8 +490,8 @@ int main(int argc, char* argv[]) {
                 dashboard_state.dashboard_message = "Switching to Dashboard...";
                 dashboard_state.UpdateHealthStatus(api_client.CheckHealth());
                 dashboard_state.log_lines = log_reader.ReadEventsLog();
-                auto condition_data = TemperatureGraphGenerator::ReadLast6Hours();
-                dashboard_state.temperature_graph = TemperatureGraphGenerator::GenerateGraph(condition_data, 60, 15);
+                auto condition_data = TemperatureDataTable::ReadLast6Hours();
+                dashboard_state.temperature_graph = TemperatureDataTable::FormatAsTable(condition_data, 6, dashboard_state.temp_data_scroll);
                 if (dashboard_state.api_is_healthy) {
                     dashboard_state.cached_status = api_client.GetStatus("/status");
                 }
@@ -506,8 +511,8 @@ int main(int argc, char* argv[]) {
                 dashboard_state.dashboard_message = "Checking API health...";
                 dashboard_state.UpdateHealthStatus(api_client.CheckHealth());
                 dashboard_state.log_lines = log_reader.ReadEventsLog();
-                auto condition_data = TemperatureGraphGenerator::ReadLast6Hours();
-                dashboard_state.temperature_graph = TemperatureGraphGenerator::GenerateGraph(condition_data, 60, 15);
+                auto condition_data = TemperatureDataTable::ReadLast6Hours();
+                dashboard_state.temperature_graph = TemperatureDataTable::FormatAsTable(condition_data, 6, dashboard_state.temp_data_scroll);
                 if (dashboard_state.api_is_healthy) {
                     dashboard_state.cached_status = api_client.GetStatus("/status");
                 }
@@ -541,6 +546,21 @@ int main(int argc, char* argv[]) {
             }
             if (event == Event::ArrowDown) {
                 if (dashboard_state.log_scroll > 0) dashboard_state.log_scroll--;
+                return true;
+            }
+            // Use [ and ] for temperature data scrolling
+            if (event == Event::Character('[')) {
+                auto condition_data = TemperatureDataTable::ReadLast6Hours();
+                int max_scroll = std::max(0, (int)condition_data.size() - 6);
+                if (dashboard_state.temp_data_scroll < max_scroll) {
+                    dashboard_state.temp_data_scroll++;
+                }
+                return true;
+            }
+            if (event == Event::Character(']')) {
+                if (dashboard_state.temp_data_scroll > 0) {
+                    dashboard_state.temp_data_scroll--;
+                }
                 return true;
             }
             return false;
