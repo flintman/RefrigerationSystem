@@ -408,7 +408,7 @@ int main(int argc, char* argv[]) {
 
             // Temperature data table block
             std::vector<Element> graph_elems;
-            graph_elems.push_back(text("Temp History (Last 6h) [ ]") | bold | color(Color::White));
+            graph_elems.push_back(text("Temp History (Last 6h) '[' / ']': Scroll") | bold | color(Color::White));
 
             // Regenerate table with current scroll position
             auto temp_condition_data = TemperatureDataTable::ReadLast6Hours();
