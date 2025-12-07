@@ -15,6 +15,7 @@
 #include <functional>
 #include <nlohmann/json.hpp>
 #include "log_manager.h"
+#include "rate_limiter.h"
 
 using json = nlohmann::json;
 
@@ -49,11 +50,13 @@ private:
     std::string config_file_;
     Logger* logger_;
     std::unique_ptr<class HTTPServer> server_;
+    std::unique_ptr<RateLimiter> rate_limiter_;
 
     // Helper methods
     void load_api_key();
     bool validate_api_key(const std::string& key);
     std::string get_error_response(int code, const std::string& message);
+    std::string extract_client_ip(const std::string& request);
 
     // API Endpoint handlers
     json handle_status_request();

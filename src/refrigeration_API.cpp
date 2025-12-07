@@ -157,6 +157,8 @@ private:
 RefrigerationAPI::RefrigerationAPI(int port, const std::string& config_file, Logger* logger)
     : port_(port), running_(false), config_file_(config_file), logger_(logger) {
     load_api_key();
+    // Initialize rate limiter: 1000 global/min, 100 per-IP/min, 200 per-key/min
+    rate_limiter_ = std::make_unique<RateLimiter>(1000, 100, 200);
 }
 
 RefrigerationAPI::~RefrigerationAPI() {
@@ -185,6 +187,39 @@ void RefrigerationAPI::load_api_key() {
         }
         api_key_ = "refrigeration-api-default-key-change-me";
     }
+}
+
+std::string RefrigerationAPI::extract_client_ip(const std::string& request) {
+    // Try to extract from X-Forwarded-For header (for reverse proxies)
+    std::istringstream req_stream(request);
+    std::string line;
+    while (std::getline(req_stream, line)) {
+        line.erase(0, line.find_first_not_of(" \t\r\n"));
+        line.erase(line.find_last_not_of(" \t\r\n") + 1);
+        if (line.empty()) continue;
+        size_t colon = line.find(":");
+        if (colon == std::string::npos) continue;
+        std::string key = line.substr(0, colon);
+        std::string value = line.substr(colon + 1);
+        key.erase(0, key.find_first_not_of(" \t\r\n"));
+        key.erase(key.find_last_not_of(" \t\r\n") + 1);
+        value.erase(0, value.find_first_not_of(" \t\r\n"));
+        value.erase(value.find_last_not_of(" \t\r\n") + 1);
+        std::string key_lower = key;
+        std::transform(key_lower.begin(), key_lower.end(), key_lower.begin(), ::tolower);
+        if (key_lower == "x-forwarded-for") {
+            // Extract first IP if comma-separated
+            size_t comma = value.find(",");
+            if (comma != std::string::npos) {
+                value = value.substr(0, comma);
+            }
+            value.erase(0, value.find_first_not_of(" \t"));
+            value.erase(value.find_last_not_of(" \t") + 1);
+            return value;
+        }
+    }
+    // Default to 127.0.0.1 if cannot extract (local connection)
+    return "127.0.0.1";
 }
 
 bool RefrigerationAPI::validate_api_key(const std::string& key) {
@@ -783,6 +818,31 @@ void RefrigerationAPI::start() {
                 api_key = query_string.substr(key_pos + 8);
                 api_key = api_key.substr(0, api_key.find('&'));
             }
+        }
+
+        // Extract client IP for rate limiting
+        std::string client_ip = extract_client_ip(request);
+
+        // Check rate limit (applies to all endpoints)
+        if (!rate_limiter_->is_allowed(client_ip, api_key)) {
+            int remaining = rate_limiter_->get_remaining_requests(client_ip);
+            int reset_in = rate_limiter_->get_reset_time(client_ip);
+
+            std::string error_body = "{\"error\":\"Rate limit exceeded\",\"remaining\":\"0\",\"reset_in_seconds\":" + std::to_string(reset_in) + "}";
+            std::string response = "HTTP/1.1 429 Too Many Requests\r\n";
+            response += "Content-Type: application/json\r\n";
+            response += "Content-Length: " + std::to_string(error_body.length()) + "\r\n";
+            response += "Retry-After: " + std::to_string(reset_in) + "\r\n";
+            response += "Access-Control-Allow-Origin: *\r\n";
+            response += "Connection: close\r\n";
+            response += "\r\n";
+            response += error_body;
+
+            if (logger_) {
+                logger_->log_events("Debug", "API: Rate limit exceeded for IP " + client_ip);
+            }
+
+            return response;
         }
 
         // Validate API key for all endpoints except /health
