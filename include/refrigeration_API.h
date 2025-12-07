@@ -16,6 +16,7 @@
 #include <nlohmann/json.hpp>
 #include "log_manager.h"
 #include "rate_limiter.h"
+#include <openssl/ssl.h>
 
 using json = nlohmann::json;
 
@@ -28,8 +29,13 @@ public:
      * @param port HTTP port to listen on (default 8080)
      * @param config_file Path to config file for API key
      * @param logger Reference to Logger instance for logging events
+     * @param enable_https Enable HTTPS/TLS encryption (default true)
+     * @param cert_file Path to SSL certificate file (auto-generated if not exists)
+     * @param key_file Path to SSL key file (auto-generated if not exists)
      */
-    RefrigerationAPI(int port = 8080, const std::string& config_file = "/etc/refrigeration/config.env", Logger* logger = nullptr);
+    RefrigerationAPI(int port = 8080, const std::string& config_file = "/etc/refrigeration/config.env", Logger* logger = nullptr,
+                     bool enable_https = true, const std::string& cert_file = "/etc/refrigeration/server.crt",
+                     const std::string& key_file = "/etc/refrigeration/server.key");
 
     ~RefrigerationAPI();
 
@@ -46,11 +52,15 @@ public:
 private:
     int port_;
     bool running_;
+    bool enable_https_;
     std::string api_key_;
     std::string config_file_;
+    std::string cert_file_;
+    std::string key_file_;
     Logger* logger_;
     std::unique_ptr<class HTTPServer> server_;
-    std::unique_ptr<RateLimiter> rate_limiter_;
+    std::unique_ptr<class RateLimiter> rate_limiter_;
+    std::unique_ptr<SSL_CTX, decltype(&SSL_CTX_free)> ssl_context_;
 
     // Helper methods
     void load_api_key();

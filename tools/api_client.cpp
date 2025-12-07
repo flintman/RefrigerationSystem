@@ -11,7 +11,7 @@ APIClient::APIClient(const std::string& host, int port, const std::string& api_k
 }
 
 void APIClient::Initialize(const std::string& host, int port) {
-    api_base_url = "http://" + host + ":" + std::to_string(port) + "/api/v1";
+    api_base_url = "https://" + host + ":" + std::to_string(port) + "/api/v1";
 }
 
 void APIClient::SetAPIKey(const std::string& new_key) {
@@ -23,9 +23,9 @@ std::string APIClient::ExecuteCurl(const std::string& method, const std::string&
     std::string cmd;
 
     if (method == "GET") {
-        cmd = "curl -s -m 3 -H \"X-API-Key:" + api_key + "\" " + url + " 2>&1";
+        cmd = "curl -s -k -m 3 -H \"X-API-Key:" + api_key + "\" " + url + " 2>&1";
     } else if (method == "POST") {
-        cmd = "curl -s -m 3 -X POST -H \"X-API-Key: " + api_key + "\" " + url + " 2>&1";
+        cmd = "curl -s -k -m 3 -X POST -H \"X-API-Key: " + api_key + "\" " + url + " 2>&1";
     }
 
     FILE* pipe = popen(cmd.c_str(), "r");
@@ -102,7 +102,7 @@ std::string APIClient::PostControl(const std::string& endpoint) {
 nlohmann::json APIClient::SetDemoMode(bool enable) {
     std::string url = api_base_url + "/demo-mode";
     std::string json_data = enable ? "{\"enable\": true}" : "{\"enable\": false}";
-    std::string cmd = "curl -s -m 3 -X POST -H \"X-API-Key: " + api_key + "\" " +
+    std::string cmd = "curl -s -k -m 3 -X POST -H \"X-API-Key: " + api_key + "\" " +
                       "-H \"Content-Type: application/json\" " +
                       "-d '" + json_data + "' " + url + " 2>&1";
 

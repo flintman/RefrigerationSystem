@@ -8,6 +8,7 @@
 #include "config_manager.h"
 #include "config_validator.h"
 #include "alarm.h"
+#include "ssl_utils.h"
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -41,7 +42,8 @@ class HTTPServer {
 public:
     using RequestHandler = std::function<std::string(const std::string&, const std::string&)>;
 
-    HTTPServer(int port, Logger* logger = nullptr) : port_(port), running_(false), server_fd_(-1), logger_(logger) {}
+    HTTPServer(int port, Logger* logger = nullptr, SSL_CTX* ssl_ctx = nullptr)
+        : port_(port), running_(false), server_fd_(-1), logger_(logger), ssl_ctx_(ssl_ctx) {}
 
     ~HTTPServer() {
         if (running_) stop();
@@ -104,6 +106,7 @@ private:
     bool running_;
     int server_fd_;
     Logger* logger_;
+    SSL_CTX* ssl_ctx_;
     RequestHandler handler_;
 
     void accept_loop() {
@@ -127,10 +130,32 @@ private:
         tv.tv_usec = 0;
         setsockopt(client_fd, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv, sizeof(tv));
 
+        // Handle SSL/TLS if enabled
+        SSL* ssl = nullptr;
+        if (ssl_ctx_) {
+            ssl = SSL_new(ssl_ctx_);
+            if (!ssl) {
+                close(client_fd);
+                return;
+            }
+            SSL_set_fd(ssl, client_fd);
+            if (SSL_accept(ssl) <= 0) {
+                SSL_free(ssl);
+                close(client_fd);
+                return;
+            }
+        }
+
         char buffer[4096] = {0};
-        int bytes_read = recv(client_fd, buffer, sizeof(buffer) - 1, 0);
+        int bytes_read;
+        if (ssl) {
+            bytes_read = SSL_read(ssl, buffer, sizeof(buffer) - 1);
+        } else {
+            bytes_read = recv(client_fd, buffer, sizeof(buffer) - 1, 0);
+        }
 
         if (bytes_read <= 0) {
+            if (ssl) SSL_free(ssl);
             close(client_fd);
             return;
         }
@@ -149,16 +174,39 @@ private:
         std::string response = handler_(request, body);
 
         // Send HTTP response
-        send(client_fd, response.c_str(), response.length(), 0);
+        if (ssl) {
+            SSL_write(ssl, response.c_str(), response.length());
+        } else {
+            send(client_fd, response.c_str(), response.length(), 0);
+        }
+
+        if (ssl) SSL_free(ssl);
         close(client_fd);
     }
 };
 
-RefrigerationAPI::RefrigerationAPI(int port, const std::string& config_file, Logger* logger)
-    : port_(port), running_(false), config_file_(config_file), logger_(logger) {
+RefrigerationAPI::RefrigerationAPI(int port, const std::string& config_file, Logger* logger,
+                                   bool enable_https, const std::string& cert_file, const std::string& key_file)
+    : port_(port), running_(false), enable_https_(enable_https), config_file_(config_file),
+      cert_file_(cert_file), key_file_(key_file), logger_(logger),
+      ssl_context_(nullptr, &SSL_CTX_free) {
     load_api_key();
     // Initialize rate limiter: 1000 global/min, 100 per-IP/min, 200 per-key/min
     rate_limiter_ = std::make_unique<RateLimiter>(1000, 100, 200);
+
+    // Initialize SSL context if HTTPS is enabled
+    if (enable_https_) {
+        ssl_context_ = SSLContext::create_context(cert_file_, key_file_, true);
+        if (ssl_context_) {
+            if (logger_) {
+                logger_->log_events("Debug", "HTTPS/TLS support enabled");
+            }
+        } else {
+            if (logger_) {
+                logger_->log_events("Error", "Failed to initialize SSL context. API will use HTTP only.");
+            }
+        }
+    }
 }
 
 RefrigerationAPI::~RefrigerationAPI() {
@@ -769,9 +817,14 @@ void RefrigerationAPI::start() {
 
     if (logger_) {
         logger_->log_events("Debug", "API Server starting on port " + std::to_string(port_));
+        if (enable_https_ && ssl_context_) {
+            logger_->log_events("Debug", "Using HTTPS/TLS encryption");
+        } else if (enable_https_) {
+            logger_->log_events("Debug", "HTTPS enabled but SSL context failed to initialize - using HTTP");
+        }
     }
 
-    server_ = std::make_unique<HTTPServer>(port_, logger_);
+    server_ = std::make_unique<HTTPServer>(port_, logger_, ssl_context_.get());
 
     server_->start([this](const std::string& request, const std::string& body) -> std::string {
         std::istringstream iss(request);
