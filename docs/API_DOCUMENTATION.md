@@ -406,9 +406,6 @@ Update one or more configuration items.
 **Updateable Fields:**
 All configuration items except:
 - `timestamp` - Read-only (server timestamp)
-- `active_alarms` - Read-only (current alarm status)
-- `alarm_warning` - Read-only (alarm status)
-- `alarm_shutdown` - Read-only (alarm status)
 - `unit.compressor_run_seconds` - Read-only (accumulated runtime)
 - `api.key` - Cannot be updated via API for security reasons
 - `api.port` - Cannot be updated via API for security reasons
@@ -558,7 +555,7 @@ Connection: close
 ### Get System Status
 ```bash
 curl -H "X-API-Key:refrigeration-api-default-key-change-me" \
-  http://xxx.xxx.xxx.xxx:8095/api/v1/status
+  https://xxx.xxx.xxx.xxx:8095/api/v1/status
 ```
 
 ### Set Setpoint to 38°F
@@ -567,39 +564,39 @@ curl -X POST \
   -H "X-API-Key:refrigeration-api-default-key-change-me" \
   -H "Content-Type: application/json" \
   -d '{"setpoint": 38}' \
-  http://xxx.xxx.xxx.xxx:8095/api/v1/setpoint
+  https://xxx.xxx.xxx.xxx:8095/api/v1/setpoint
 ```
 
 ### Get Sensor Data
 ```bash
 curl -H "X-API-Key:refrigeration-api-default-key-change-me" \
-  http://xxx.xxx.xxx.xxx:8095/api/v1/sensors
+  https://xxx.xxx.xxx.xxx:8095/api/v1/sensors
 ```
 
 ### Get All Relay Status
 ```bash
 curl -H "X-API-Key:refrigeration-api-default-key-change-me" \
-  http://xxx.xxx.xxx.xxx:8095/api/v1/relays
+  https://xxx.xxx.xxx.xxx:8095/api/v1/relays
 ```
 
 ### Reset Alarms
 ```bash
 curl -X POST \
   -H "X-API-Key:refrigeration-api-default-key-change-me" \
-  http://xxx.xxx.xxx.xxx:8095/api/v1/alarms/reset
+  https://xxx.xxx.xxx.xxx:8095/api/v1/alarms/reset
 ```
 
 ### Trigger Defrost
 ```bash
 curl -X POST \
   -H "X-API-Key:refrigeration-api-default-key-change-me" \
-  http://xxx.xxx.xxx.xxx:8095/api/v1/defrost/trigger
+  https://xxx.xxx.xxx.xxx:8095/api/v1/defrost/trigger
 ```
 
 ### Get System Information
 ```bash
 curl -H "X-API-Key:refrigeration-api-default-key-change-me" \
-  http://xxx.xxx.xxx.xxx:8095/api/v1/system-info
+  https://xxx.xxx.xxx.xxx:8095/api/v1/system-info
 ```
 
 ### Update Configuration
@@ -608,7 +605,7 @@ curl -X POST \
   -H "X-API-Key:refrigeration-api-default-key-change-me" \
   -H "Content-Type: application/json" \
   -d '{"defrost.interval_hours": "10", "setpoint.high_limit": "85", "wifi.hotspot_password": "newpassword"}' \
-  http://xxx.xxx.xxx.xxx:8095/api/v1/config
+  https://xxx.xxx.xxx.xxx:8095/api/v1/config
 ```
 
 ### Enable Demo Mode
@@ -617,7 +614,7 @@ curl -X POST \
   -H "X-API-Key:refrigeration-api-default-key-change-me" \
   -H "Content-Type: application/json" \
   -d '{"enable": true}' \
-  http://xxx.xxx.xxx.xxx:8095/api/v1/demo-mode
+  https://xxx.xxx.xxx.xxx:8095/api/v1/demo-mode
 ```
 
 ### Disable Demo Mode
@@ -626,26 +623,26 @@ curl -X POST \
   -H "X-API-Key:refrigeration-api-default-key-change-me" \
   -H "Content-Type: application/json" \
   -d '{"enable": false}' \
-  http://xxx.xxx.xxx.xxx:8095/api/v1/demo-mode
+  https://xxx.xxx.xxx.xxx:8095/api/v1/demo-mode
 ```
 
 ### Get Current Demo Mode Status
 ```bash
 curl -H "X-API-Key:refrigeration-api-default-key-change-me" \
-  http://xxx.xxx.xxx.xxx:8095/api/v1/demo-mode
+  https://xxx.xxx.xxx.xxx:8095/api/v1/demo-mode
 ```
 
 ### Download Events Log
 ```bash
 curl -H "X-API-Key:refrigeration-api-default-key-change-me" \
-  "http://xxx.xxx.xxx.xxx:8095/api/v1/logs/events?date=2025-12-05" \
+  "https://xxx.xxx.xxx.xxx:8095/api/v1/logs/events?date=2025-12-05" \
   -o events-2025-12-05.log
 ```
 
 ### Download Conditions Log
 ```bash
 curl -H "X-API-Key:refrigeration-api-default-key-change-me" \
-  "http://xxx.xxx.xxx.xxx:8095/api/v1/logs/conditions?date=2025-12-05" \
+  "https://xxx.xxx.xxx.xxx:8095/api/v1/logs/conditions?date=2025-12-05" \
   -o conditions-2025-12-05.log
 ```
 

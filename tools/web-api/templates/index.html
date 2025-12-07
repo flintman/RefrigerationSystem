@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Refrigeration Unit Monitor</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Refrigeration Unit Monitor</h1>
+            <div>
+                <button class="dark-mode-toggle" onclick="toggleDarkMode()">Dark Mode</button>
+            </div>
+        </div>
+        <div id="loginStatusBar" style="display:none; margin-bottom: 12px; text-align:right;">
+            <span style="color:#388E3C; font-weight:bold; margin-right:10px;">Logged in</span>
+            <button class="logout-btn" onclick="logoutDashboard()">Logout</button>
+        </div>
+        <div class="refresh">
+            <button onclick="location.reload()">Refresh</button>
+        </div>
+        <div id="units" class="units-grid">
+            <p>Loading units...</p>
+        </div>
+    </div>
+
+    <!-- Login Modal -->
+    <div id="loginModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeLoginModal()">&times;</span>
+            <h2>Enter Password</h2>
+            <form class="login-form" onsubmit="handleLogin(event)">
+                <input type="password" id="passwordInput" placeholder="Enter password" required>
+                <button type="submit">Unlock Unit</button>
+                <div id="loginError" style="color: #f44336; font-size: 14px; display: none;"></div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Control Page -->
+    <div id="controlPage" class="control-page">
+        <div class="container">
+            <div class="header">
+                <h1>Unit <span id="controlUnitId"></span> Control Panel</h1>
+                <div>
+                    <button onclick="refreshControlPanel()" style="margin-right: 10px; background-color: #2196F3;">Refresh Now</button>
+                    <button onclick="backToDashboard()">Back to Dashboard</button>
+                </div>
+            </div>
+            <p style="color: #999; font-size: 12px; margin: 10px 0;">Last refreshed: <span id="lastRefreshTime">--:--:--</span></p>
+            <div class="control-grid">
+                <div class="control-section">
+                    <h3>Unit Status</h3>
+                    <div id="statusInfo"></div>
+                </div>
+                <div class="control-section">
+                    <h3>Actions</h3>
+                    <button class="danger action-btn" onclick="resetAlarm()">Reset Alarm</button>
+                    <button class="success action-btn" onclick="sendDefrost()">Defrost</button>
+                    <button class="warning action-btn" onclick="toggleDemoMode()">Toggle Demo Mode</button>
+                    <button class="action-btn" onclick="downloadTodayAndYesterdayLogs()">Download Events Logs (Today & Yesterday)</button>
+                </div>
+                <div class="control-section">
+                    <h3>Setpoint Control</h3>
+                    <label>Setpoint (°F):</label>
+                    <input type="number" id="setpointInput" class="control-input" step="0.5">
+                    <button onclick="updateSetpoint()">Update Setpoint</button>
+                </div>
+                <div class="control-section">
+                    <h3>Configuration</h3>
+                    <label>Defrost Coil Temp (°F): <span class="help-icon" data-tooltip="Temperature at which defrost cycle triggers.">?</span></label>
+                    <input type="number" id="defrostCoilTempInput" class="control-input" step="1">
+                    <label>Defrost Interval (hours): <span class="help-icon" data-tooltip="Hours between automatic defrost cycles.">?</span></label>
+                    <input type="number" id="defrostIntervalInput" class="control-input" step="1">
+                    <label>Defrost Timeout (mins): <span class="help-icon" data-tooltip="Maximum duration for a defrost cycle.">?</span></label>
+                    <input type="number" id="defrostTimeoutInput" class="control-input" step="1">
+                    <label>Logging Interval (mins): <span class="help-icon" data-tooltip="Minutes between log entries.">?</span></label>
+                    <input type="number" id="loggingIntervalInput" class="control-input" step="1">
+                    <label>Logging Retention (days): <span class="help-icon" data-tooltip="Days to keep log data.">?</span></label>
+                    <input type="number" id="loggingRetentionInput" class="control-input" step="1">
+                    <label>Compressor Timer (mins): <span class="help-icon" data-tooltip="Minimum off-time for compressor between cycles.">?</span></label>
+                    <input type="number" id="compressorTimerInput" class="control-input" step="1">
+                    <label>Setpoint Low Limit (°F): <span class="help-icon" data-tooltip="Lowest allowed setpoint temperature.">?</span></label>
+                    <input type="number" id="setpointLowInput" class="control-input" step="0.5">
+                    <label>Setpoint High Limit (°F): <span class="help-icon" data-tooltip="Highest allowed setpoint temperature.">?</span></label>
+                    <input type="number" id="setpointHighInput" class="control-input" step="0.5">
+                    <label>Setpoint Offset (°F): <span class="help-icon" data-tooltip="Calibration offset for setpoint.">?</span></label>
+                    <input type="number" id="setpointOffsetInput" class="control-input" step="0.5">
+                    <label>Electric Heat (0/1): <span class="help-icon" data-tooltip="Enable (1) or disable (0) electric heat.">?</span></label>
+                    <input type="number" id="electricHeatInput" class="control-input" min="0" max="1" step="1">
+                    <label>Fan Continuous (0/1): <span class="help-icon" data-tooltip="Enable (1) or disable (0) continuous fan operation.">?</span></label>
+                    <input type="number" id="fanContinuousInput" class="control-input" min="0" max="1" step="1">
+                    <label>Relay Active Low (0/1): <span class="help-icon" data-tooltip="Relay triggers on low (1) or high (0) signal.">?</span></label>
+                    <input type="number" id="relayActiveLowInput" class="control-input" min="0" max="1" step="1">
+                    <label>Unit Number: <span class="help-icon" data-tooltip="Unique identifier for this refrigeration unit.">?</span></label>
+                    <input type="number" id="unitNumberInput" class="control-input" step="1">
+                    <button onclick="updateConfig()">Save Configuration</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/script.js"></script>
+</body>
+</html>
