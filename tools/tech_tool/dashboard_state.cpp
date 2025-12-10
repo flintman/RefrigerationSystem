@@ -32,4 +32,18 @@ void DashboardState::Reset() {
 void DashboardState::UpdateHealthStatus(const std::string& health_message) {
     dashboard_message = health_message;
     api_is_healthy = (health_message.find("✓") != std::string::npos);
+
+}
+
+void DashboardState::UpdateAlarmStatus() {
+    has_alarm = false;
+    if (cached_status.contains("alarm_warning") && cached_status["alarm_warning"].is_boolean()) {
+        has_alarm = has_alarm || cached_status["alarm_warning"].get<bool>();
+    }
+    if (cached_status.contains("alarm_shutdown") && cached_status["alarm_shutdown"].is_boolean()) {
+        has_alarm = has_alarm || cached_status["alarm_shutdown"].get<bool>();
+    }
+    if (cached_status.contains("active_alarms") && cached_status["active_alarms"].is_array()) {
+        has_alarm = has_alarm || !cached_status["active_alarms"].empty();
+    }
 }

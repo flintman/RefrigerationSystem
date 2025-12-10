@@ -48,4 +48,9 @@ public:
      * Update health status and related flags
      */
     void UpdateHealthStatus(const std::string& health_message);
+
+    /**
+     * Update has_alarm based on API alarm fields (active_alarms, alarm_warning, alarm_shutdown)
+     */
+    void UpdateAlarmStatus();
 };

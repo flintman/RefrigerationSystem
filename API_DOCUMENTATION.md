@@ -59,7 +59,10 @@ Get complete system status including relays, sensors, and setpoint.
     "supply_temp": 42.1,
     "coil_temp": 35.2
   },
-  "setpoint": 40.0
+  "setpoint": 40.0,
+  "active_alarms": [],
+  "alarm_warning": false,
+  "alarm_shutdown": false
 }
 ```
 
@@ -75,6 +78,9 @@ Get complete system status including relays, sensors, and setpoint.
   - `supply_temp`: Supply line temperature
   - `coil_temp`: Evaporator coil temperature
 - `setpoint`: Target temperature setpoint
+- `active_alarms`: Array of currently active alarm codes
+- `alarm_warning`: Warning-level alarm active (boolean)
+- `alarm_shutdown`: Shutdown-level alarm active (boolean)
 
 ---
 
@@ -309,9 +315,6 @@ Get comprehensive system configuration and status information.
   "unit.setpoint": "55",
   "wifi.enable_hotspot": "1",
   "wifi.hotspot_password": "changeme",
-  "active_alarms": [],
-  "alarm_warning": false,
-  "alarm_shutdown": false,
   "timestamp": 1764953832
 }
 ```
@@ -341,11 +344,6 @@ Configuration parameters:
 - `unit.setpoint`: Current setpoint (°F)
 - `wifi.enable_hotspot`: WiFi hotspot enabled (1 = yes, 0 = no)
 - `wifi.hotspot_password`: WiFi hotspot password
-
-Alarm status:
-- `active_alarms`: Array of currently active alarm codes
-- `alarm_warning`: Warning-level alarm active
-- `alarm_shutdown`: Shutdown-level alarm active
 
 ---
 

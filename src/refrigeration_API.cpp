@@ -311,6 +311,10 @@ json RefrigerationAPI::handle_status_request() {
             status_response["relays"]["valve"] = (status["valve"] == "True");
             status_response["relays"]["electric_heater"] = (status["electric_heater"] == "True");
             status_response["system_status"] = status["status"];
+            // Add alarm info to status response
+            status_response["active_alarms"] = systemAlarm.getAlarmCodes();
+            status_response["alarm_warning"] = systemAlarm.getWarningStatus();
+            status_response["alarm_shutdown"] = systemAlarm.getShutdownStatus();
         }
     } catch (...) {
         status_response["relays"] = json::object();
@@ -577,19 +581,6 @@ json RefrigerationAPI::handle_system_info_request() {
         info["unit.setpoint"] = config.get("unit.setpoint");
         info["wifi.enable_hotspot"] = config.get("wifi.enable_hotspot");
         info["wifi.hotspot_password"] = config.get("wifi.hotspot_password");
-
-        // Get alarm codes if alarm system is available
-        {
-            auto codes = systemAlarm.getAlarmCodes();
-            info["active_alarms"] = codes;
-            info["alarm_warning"] = systemAlarm.getWarningStatus();
-            info["alarm_shutdown"] = systemAlarm.getShutdownStatus();
-
-            if (logger_) {
-                logger_->log_events("Debug", "API: System info - Unit: " + info["unit.number"].get<std::string>() +
-                                  ", Active alarms: " + std::to_string(codes.size()));
-            }
-        }
 
         info["timestamp"] = std::time(nullptr);
     } catch (const std::exception& e) {

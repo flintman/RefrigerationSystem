@@ -391,11 +391,22 @@ int main(int argc, char* argv[]) {
             }
 
             if (dashboard_state.api_is_healthy && dashboard_state.has_alarm) {
-                status_elems.push_back(text("[A] Reset Alarm") | color(Color::RedLight) | bold);
-            } else if (dashboard_state.api_is_healthy &&
-                       dashboard_state.cached_status.contains("system_status") &&
-                       dashboard_state.cached_status["system_status"].is_string() &&
-                       dashboard_state.cached_status["system_status"].get<std::string>() == "Alarm") {
+                status_elems.push_back(text("ALARM: System in alarm state!") | bold | color(Color::RedLight));
+                // Show warning/shutdown status
+                if (dashboard_state.cached_status.contains("alarm_warning") && dashboard_state.cached_status["alarm_warning"].is_boolean() && dashboard_state.cached_status["alarm_warning"].get<bool>()) {
+                    status_elems.push_back(text("Warning-level alarm active") | color(Color::YellowLight) | bold);
+                }
+                if (dashboard_state.cached_status.contains("alarm_shutdown") && dashboard_state.cached_status["alarm_shutdown"].is_boolean() && dashboard_state.cached_status["alarm_shutdown"].get<bool>()) {
+                    status_elems.push_back(text("Shutdown-level alarm active") | color(Color::RedLight) | bold);
+                }
+                // Show active alarm codes
+                if (dashboard_state.cached_status.contains("active_alarms") && dashboard_state.cached_status["active_alarms"].is_array() && !dashboard_state.cached_status["active_alarms"].empty()) {
+                    std::string alarm_codes = "Codes: ";
+                    for (const auto& code : dashboard_state.cached_status["active_alarms"]) {
+                        alarm_codes += std::to_string(code.get<int>()) + " ";
+                    }
+                    status_elems.push_back(text(alarm_codes) | color(Color::RedLight));
+                }
                 status_elems.push_back(text("[A] Reset Alarm") | color(Color::RedLight) | bold);
             }
 
@@ -499,6 +510,7 @@ int main(int argc, char* argv[]) {
                 dashboard_state.temperature_graph = TemperatureDataTable::FormatAsTable(condition_data, 6, dashboard_state.temp_data_scroll);
                 if (dashboard_state.api_is_healthy) {
                     dashboard_state.cached_status = api_client.GetStatus("/status");
+                    dashboard_state.UpdateAlarmStatus();
                 }
             } else {
                 current_tab = TabPage::Config;
@@ -519,6 +531,7 @@ int main(int argc, char* argv[]) {
                 dashboard_state.temperature_graph = TemperatureDataTable::FormatAsTable(condition_data, 6, dashboard_state.temp_data_scroll);
                 if (dashboard_state.api_is_healthy) {
                     dashboard_state.cached_status = api_client.GetStatus("/status");
+                    dashboard_state.UpdateAlarmStatus();
                 }
                 dashboard_state.control_response.clear();
                 return true;
