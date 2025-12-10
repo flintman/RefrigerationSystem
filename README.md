@@ -2,7 +2,7 @@
 
 ## License
 
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License. See the ['docs/LICENSE'](docs/LICENSE) file for details.
 
 ## Third-Party Licenses
 
@@ -11,10 +11,10 @@ This project includes third-party software:
 - **OpenSSL** (Apache License 2.0) — see [`vendor/openssl/LICENSE.txt`](vendor/openssl/LICENSE.txt)
 - **ws2811** (MIT License) — see [`vendor/ws2811/LICENSE`](vendor/ws2811/LICENSE)
 - **FTXUI** (MIT License) — see [`vendor/FTXUI/LICENSE`](vendor/FTXUI/LICENSE)
-- **nlohmann/json** (MIT License) — see [`include/nlohmann/json.hpp`](include/nlohmann/json.hpp)
+- **nlohmann/json** (MIT License) — see [`vendor/nlohmann_json/LICENSE.MIT`](vendor/nlohmann_json/LICENSE.MIT)
 
 All third-party licenses are included in the source distribution.
-See [THIRD_PARTY_LICENSES](THIRD_PARTY_LICENSES.md) for details.
+See ['docs/THIRD_PARTY_LICENSES'](docs/THIRD_PARTY_LICENSES.md) for details.
 When redistributing or packaging this software, be sure to include all relevant license files.
 
 ---
