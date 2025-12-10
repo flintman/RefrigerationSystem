@@ -658,6 +658,7 @@ json RefrigerationAPI::handle_config_update_request(const json& config_updates) 
 
                 // Update the config
                 config.set(key, str_value);
+                config.save();
                 updated_items[key] = str_value;
 
                 if (logger_) {

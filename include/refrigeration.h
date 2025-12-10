@@ -23,11 +23,12 @@
 inline const std::string version = "2.5.0"; //Make sure you update the version in Makefile.
 inline const std::string config_file_name = "/etc/refrigeration/config.env";
 inline ConfigManager cfg(config_file_name);
+inline std::atomic_int debug_code{stoi(cfg.get("debug.code"))};
+inline std::atomic_int api_port{stoi(cfg.get("api.port"))};
 
 // Global state and synchronization
 inline std::atomic<bool> running{true};
 inline std::mutex status_mutex;
-inline std::atomic_int debug_code{stoi(cfg.get("debug.code"))};
 
 // Managers and hardware
 inline GpioManager gpio;
@@ -40,7 +41,7 @@ inline Logger logger(debug_code.load());
 inline WiFiManager wifi_manager;
 inline Alarm systemAlarm;
 inline DemoRefrigeration demo;
-inline RefrigerationAPI api(stoi(cfg.get("api.port")), config_file_name, &logger);
+inline RefrigerationAPI api(api_port.load(), config_file_name, &logger);
 
 // Alarm state
 inline std::atomic<bool> isShutdownAlarm{false};
@@ -61,10 +62,8 @@ inline std::atomic<time_t> state_timer{time(nullptr)};
 inline std::atomic<time_t> pretrip_stage_start{0};
 inline std::atomic<int> pretrip_stage{0};
 inline std::atomic<time_t> compressor_on_start_time{0};
-inline std::atomic<long> compressor_on_total_seconds{cfg.get("unit.compressor_run_seconds") == "0" ? 0 : std::stol(cfg.get("unit.compressor_run_seconds"))};
 inline std::string last_compressor_status{"False"};
-inline std::atomic<bool> unit_has_electric_heater{cfg.get("unit.electric_heat") == "1" ? true : false};
-
+inline std::atomic<long> compressor_on_total_seconds{(cfg.get("unit.compressor_run_seconds") == "0" ? 0 : std::stol(cfg.get("unit.compressor_run_seconds")))};
 
 // Status map
 inline std::map<std::string, std::string> status = {
@@ -82,8 +81,6 @@ inline std::atomic<float> coil_temp{-327.0f};
 inline std::atomic<float> setpoint{std::stof(cfg.get("unit.setpoint"))};
 
 // Logging config
-inline std::atomic<int> log_retention_period{stoi(cfg.get("logging.retention_period"))};
-inline std::atomic<int> log_interval{stoi(cfg.get("logging.interval_mins")) * 60}; // Convert minutes to seconds
 inline std::atomic<time_t> last_log_timestamp{time(nullptr) - 400};
 
 // Function declarations

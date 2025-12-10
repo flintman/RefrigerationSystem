@@ -78,7 +78,7 @@ void update_sensor_thread() {
         }
 
         time_t current_time = time(nullptr);
-        if (current_time - last_log_timestamp >= static_cast<time_t>(log_interval)) {
+        if (current_time - last_log_timestamp >= static_cast<time_t>((stoi(cfg.get("logging.interval_mins")) * 60))) {
             logger.log_conditions(setpoint, return_temp, coil_temp, supply_temp, local_status);
             last_log_timestamp = time(nullptr);
         }
@@ -189,7 +189,7 @@ void update_gpio_from_status() {
     gpio.write("fan_pin", relayNO ? (status["fan"] == "False") : (status["fan"] == "True"));
     gpio.write("compressor_pin", relayNO ? (status["compressor"] == "False") : (status["compressor"] == "True"));
     gpio.write("valve_pin", relayNO ? (status["valve"] == "False") : (status["valve"] == "True"));
-    if (unit_has_electric_heater) {
+    if ((cfg.get("unit.electric_heat") == "1" ? true : false)) {
         gpio.write("electric_heater_pin", relayNO ? (status["electric_heater"] == "False") : (status["electric_heater"] == "True"));
     } else {
         logger.log_events("Debug", "Electric heater not configured, skipping GPIO update for electric_heater_pin");
@@ -200,11 +200,6 @@ void update_gpio_from_status() {
 void refrigeration_system(float return_temp_, float supply_temp_, float coil_temp_, float setpoint_) {
     std::string status_;
     time_t current_time = time(nullptr);
-    int off_timer_value = stoi(cfg.get("compressor.off_timer")) * 60;
-    int setpoint_offset = stoi(cfg.get("setpoint.offset"));
-    int defrost_coil_temperature = stoi(cfg.get("defrost.coil_temperature"));
-    int defrost_timeout = stoi(cfg.get("defrost.timeout_mins")) * 60;
-    int defrost_intervals = (stoi(cfg.get("defrost.interval_hours")) * 60) * 60;
     bool defrost_timed_out = false;
 
     {
@@ -222,11 +217,11 @@ void refrigeration_system(float return_temp_, float supply_temp_, float coil_tem
         }
 
         if (status_ == "Null") {
-            if (current_time - compressor_last_stop_time >= static_cast<time_t>(off_timer_value)) {
-                if (return_temp_ >= (setpoint_ + setpoint_offset)) {
+            if (current_time - compressor_last_stop_time >= static_cast<time_t>((stoi(cfg.get("compressor.off_timer")) * 60))) {
+                if (return_temp_ >= (setpoint_ + (stoi(cfg.get("setpoint.offset"))))) {
                     cooling_mode();
                 }
-                if (return_temp_ <= (setpoint_ - setpoint_offset)) {
+                if (return_temp_ <= (setpoint_ - (stoi(cfg.get("setpoint.offset"))))) {
                     heating_mode();
                 }
                 anti_timer = false;
@@ -239,8 +234,8 @@ void refrigeration_system(float return_temp_, float supply_temp_, float coil_tem
         }
 
         if (status_ == "Defrost") {
-            defrost_timed_out = (current_time - defrost_start_time) > defrost_timeout;
-            if ((coil_temp_ > defrost_coil_temperature) || defrost_timed_out) {
+            defrost_timed_out = (current_time - defrost_start_time) > (stoi(cfg.get("defrost.timeout_mins")) * 60);
+            if ((coil_temp_ > (stoi(cfg.get("defrost.coil_temperature")))) || defrost_timed_out) {
                 null_mode();
                 defrost_last_time = time(nullptr);
                 defrost_start_time = 0;
@@ -253,8 +248,8 @@ void refrigeration_system(float return_temp_, float supply_temp_, float coil_tem
             defrost_timed_out = false;
         }
 
-        if (coil_temp_ < defrost_coil_temperature) {
-            if (((current_time - defrost_last_time) > defrost_intervals) || trigger_defrost) {
+        if (coil_temp_ < (stoi(cfg.get("defrost.coil_temperature")))) {
+            if (((current_time - defrost_last_time) > ((stoi(cfg.get("defrost.interval_hours")) * 60) * 60)) || trigger_defrost) {
                 if (defrost_start_time == 0) {
                     defrost_mode();
                 }
@@ -864,7 +859,7 @@ int main(int argc, char* argv[]) {
             alarm_system.join();
             api_system.join();
 
-            logger.clear_old_logs(log_retention_period);
+            logger.clear_old_logs((stoi(cfg.get("logging.retention_period"))));
         }
     } catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << std::endl;
