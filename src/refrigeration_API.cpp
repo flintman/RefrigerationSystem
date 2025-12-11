@@ -298,10 +298,6 @@ json RefrigerationAPI::handle_status_request() {
     status_response["system"] = "Refrigeration Control System";
     status_response["version"] = REFRIGERATION_API_VERSION;
 
-    if (logger_) {
-        logger_->log_events("Debug", "API: Status request received");
-    }
-
     try {
         status_response["relays"] = json::object();
         {
@@ -338,19 +334,11 @@ json RefrigerationAPI::handle_status_request() {
         }
     }
 
-    if (logger_) {
-        logger_->log_events("Debug", "API: Status response sent - System: " + status_response["system_status"].get<std::string>());
-    }
-
     return status_response;
 }
 
 json RefrigerationAPI::handle_relay_status_request() {
     json relays;
-
-    if (logger_) {
-        logger_->log_events("Debug", "API: Relay status request received");
-    }
 
     try {
         std::lock_guard<std::mutex> lock(status_mutex);
@@ -359,11 +347,6 @@ json RefrigerationAPI::handle_relay_status_request() {
         relays["valve"] = (status["valve"] == "True");
         relays["electric_heater"] = (status["electric_heater"] == "True");
         relays["timestamp"] = std::time(nullptr);
-
-        if (logger_) {
-            logger_->log_events("Debug", "API: Relay status - Compressor: " + std::string(relays["compressor"].get<bool>() ? "ON" : "OFF") +
-                              ", Fan: " + std::string(relays["fan"].get<bool>() ? "ON" : "OFF"));
-        }
     } catch (const std::exception& e) {
         relays["error"] = e.what();
         if (logger_) {
@@ -377,22 +360,12 @@ json RefrigerationAPI::handle_relay_status_request() {
 json RefrigerationAPI::handle_sensor_status_request() {
     json sensors;
 
-    if (logger_) {
-        logger_->log_events("Debug", "API: Sensor status request received");
-    }
-
     try {
         sensors["return_temp"] = return_temp.load();
         sensors["supply_temp"] = supply_temp.load();
         sensors["coil_temp"] = coil_temp.load();
         sensors["setpoint"] = setpoint.load();
         sensors["timestamp"] = std::time(nullptr);
-
-        if (logger_) {
-            logger_->log_events("Debug", "API: Sensor data - Return: " + std::to_string(sensors["return_temp"].get<float>()) +
-                              "°F, Supply: " + std::to_string(sensors["supply_temp"].get<float>()) +
-                              "°F, Coil: " + std::to_string(sensors["coil_temp"].get<float>()) + "°F");
-        }
     } catch (const std::exception& e) {
         sensors["error"] = e.what();
         if (logger_) {
@@ -406,17 +379,9 @@ json RefrigerationAPI::handle_sensor_status_request() {
 json RefrigerationAPI::handle_setpoint_get_request() {
     json response;
 
-    if (logger_) {
-        logger_->log_events("Debug", "API: Setpoint GET request received");
-    }
-
     try {
         response["setpoint"] = setpoint.load();
         response["timestamp"] = std::time(nullptr);
-
-        if (logger_) {
-            logger_->log_events("Debug", "API: Returning setpoint: " + std::to_string(response["setpoint"].get<float>()));
-        }
     } catch (const std::exception& e) {
         response["error"] = e.what();
         if (logger_) {
@@ -470,10 +435,6 @@ json RefrigerationAPI::handle_setpoint_set_request(float new_setpoint) {
 
 json RefrigerationAPI::handle_alarm_reset_request() {
     json response;
-
-    if (logger_) {
-        logger_->log_events("Debug", "API: Alarm reset request received");
-    }
 
     try {
         systemAlarm.resetAlarm();
@@ -549,10 +510,6 @@ json RefrigerationAPI::handle_demo_mode_request(bool enable) {
 
 json RefrigerationAPI::handle_system_info_request() {
     json info;
-
-    if (logger_) {
-        logger_->log_events("Debug", "API: System info request received");
-    }
 
     try {
         ConfigManager config("/etc/refrigeration/config.env");
@@ -699,10 +656,6 @@ json RefrigerationAPI::handle_config_update_request(const json& config_updates) 
 }
 
 std::string RefrigerationAPI::handle_download_events_request(const std::string& date) {
-    if (logger_) {
-        logger_->log_events("Debug", "API: Download events request for date: " + date);
-    }
-
     try {
         // Validate date format (YYYY-MM-DD)
         if (date.length() != 10 || date[4] != '-' || date[7] != '-') {
@@ -729,10 +682,6 @@ std::string RefrigerationAPI::handle_download_events_request(const std::string& 
         log_file.close();
         std::string file_content = buffer.str();
 
-        if (logger_) {
-            logger_->log_events("Debug", "API: Events log file downloaded successfully, size: " + std::to_string(file_content.length()) + " bytes");
-        }
-
         // Return file with proper headers
         std::string response = "HTTP/1.1 200 OK\r\n";
         response += "Content-Type: text/plain\r\n";
@@ -752,10 +701,6 @@ std::string RefrigerationAPI::handle_download_events_request(const std::string& 
 }
 
 std::string RefrigerationAPI::handle_download_conditions_request(const std::string& date) {
-    if (logger_) {
-        logger_->log_events("Debug", "API: Download conditions request for date: " + date);
-    }
-
     try {
         // Validate date format (YYYY-MM-DD)
         if (date.length() != 10 || date[4] != '-' || date[7] != '-') {
@@ -781,10 +726,6 @@ std::string RefrigerationAPI::handle_download_conditions_request(const std::stri
         buffer << log_file.rdbuf();
         log_file.close();
         std::string file_content = buffer.str();
-
-        if (logger_) {
-            logger_->log_events("Debug", "API: Conditions log file downloaded successfully, size: " + std::to_string(file_content.length()) + " bytes");
-        }
 
         // Return file with proper headers
         std::string response = "HTTP/1.1 200 OK\r\n";
@@ -884,7 +825,7 @@ void RefrigerationAPI::start() {
             response += error_body;
 
             if (logger_) {
-                logger_->log_events("Debug", "API: Rate limit exceeded for IP " + client_ip);
+                logger_->log_events("Error", "API: Rate limit exceeded for IP " + client_ip);
             }
 
             return response;
