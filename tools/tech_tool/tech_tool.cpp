@@ -618,6 +618,7 @@ int main(int argc, char* argv[]) {
                     // User confirmed - reset to default
                     if (!keys.empty() && selected < (int)keys.size()) {
                         config.set(keys[selected], schema.at(keys[selected]).defaultValue);
+                        config.save();
                         status_message = "Reset to default: " + schema.at(keys[selected]).defaultValue;
                     }
                     awaiting_confirmation = false;
@@ -654,6 +655,7 @@ int main(int argc, char* argv[]) {
                     // Enter - save the value
                     if (!keys.empty() && selected < (int)keys.size() && !edit_value.empty()) {
                         config.set(keys[selected], edit_value);
+                        config.save();
                         status_message = "Saved: " + edit_value;
                     } else if (edit_value.empty()) {
                         status_message = "Empty value, not saved.";
