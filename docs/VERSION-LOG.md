@@ -1,4 +1,15 @@
 # Version Log
+## 2.6.0
+- **3aa36085**: api – I think we really need to save.
+- **68cc2830**: demo_mode – Only allow if debug_code = 1.
+- **9bdd1e42**: tech-tool – Fix up demo mode display to work properly now.
+- **da150725**: cleanup – Clean up API calls.
+- **2d1aa735**: documents – Clean up and put them into a folder.
+- **ffa9b730**: api – Alarms in the wrong spot, clean up.
+- **9f877283**: api – Setup API to save to file after a change.
+- **b0b1107f**: tech-tool – Move into its own folder.
+- **73bb8f08**: API – Setup encryption if you want to open it up to outside networks.
+- **5666863a**: API – Add in rate limit on API.
 ## 2.5.0
 - **e182182b**: tech-tool – Show how to move around in the temperature data.
 - **ae3c2b8b**: tech-tool – Update so q exits no matter what tab you're on.
