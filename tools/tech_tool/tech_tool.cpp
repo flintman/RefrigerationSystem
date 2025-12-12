@@ -511,6 +511,8 @@ int main(int argc, char* argv[]) {
                 if (dashboard_state.api_is_healthy) {
                     dashboard_state.cached_status = api_client.GetStatus("/status");
                     dashboard_state.UpdateAlarmStatus();
+                    auto demo_mode_response = api_client.GetDemoMode();
+                    dashboard_state.UpdateDemoMode(demo_mode_response);
                 }
             } else {
                 current_tab = TabPage::Config;
@@ -532,6 +534,8 @@ int main(int argc, char* argv[]) {
                 if (dashboard_state.api_is_healthy) {
                     dashboard_state.cached_status = api_client.GetStatus("/status");
                     dashboard_state.UpdateAlarmStatus();
+                    auto demo_mode_response = api_client.GetDemoMode();
+                    dashboard_state.UpdateDemoMode(demo_mode_response);
                 }
                 dashboard_state.control_response.clear();
                 return true;
@@ -701,6 +705,15 @@ int main(int argc, char* argv[]) {
 
         return false;
     });
+
+    // Initialize dashboard state on startup
+    dashboard_state.UpdateHealthStatus(api_client.CheckHealth());
+    if (dashboard_state.api_is_healthy) {
+        dashboard_state.cached_status = api_client.GetStatus("/status");
+        dashboard_state.UpdateAlarmStatus();
+        auto demo_mode_response = api_client.GetDemoMode();
+        dashboard_state.UpdateDemoMode(demo_mode_response);
+    }
 
     screen.Loop(main_container);
     pollingActive = false;

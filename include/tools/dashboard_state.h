@@ -53,4 +53,9 @@ public:
      * Update has_alarm based on API alarm fields (active_alarms, alarm_warning, alarm_shutdown)
      */
     void UpdateAlarmStatus();
+
+    /**
+     * Update demo_mode from JSON response (e.g., from GetDemoMode() API call)
+     */
+    void UpdateDemoMode(const nlohmann::json& response);
 };

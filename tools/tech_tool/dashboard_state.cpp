@@ -47,3 +47,9 @@ void DashboardState::UpdateAlarmStatus() {
         has_alarm = has_alarm || !cached_status["active_alarms"].empty();
     }
 }
+
+void DashboardState::UpdateDemoMode(const nlohmann::json& response) {
+    if (response.contains("demo_mode") && response["demo_mode"].is_boolean()) {
+        demo_mode = response["demo_mode"].get<bool>();
+    }
+}
