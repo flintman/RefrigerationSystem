@@ -178,7 +178,7 @@ void Logger::log_conditions(float setpoint, float return_sensor, float coil_sens
                  + "Electric_heater: " + (systems_status.count("electric_heater") ? systems_status.at("electric_heater") : "N/A");
 
         log_to_file(log_file_path, log_line + "\n");
-        log_events("Debug", log_line);
+        log_events("Info", log_line);
     } catch (const std::exception& e) {
         std::cerr << "Error logging conditions: " << e.what() << std::endl;
     }
@@ -186,7 +186,7 @@ void Logger::log_conditions(float setpoint, float return_sensor, float coil_sens
 
 void Logger::log_events(const std::string& event_type, const std::string& event_message) {
     try {
-        if (event_type == "Error" || (event_type == "Debug" && debug_code == 1)) {
+        if (event_type == "Error" || event_type == "Info" || (event_type == "Debug" && debug_code == 1)) {
             std::string log_file_path = get_log_filename("events");
             std::string timestamp = get_current_datetime();
             std::string log_line = "[" + timestamp + "] " + event_type + "] " + event_message + "\n";

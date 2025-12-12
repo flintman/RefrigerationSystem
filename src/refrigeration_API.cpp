@@ -222,7 +222,7 @@ void RefrigerationAPI::load_api_key() {
             // Generate default API key if not present
             api_key_ = "refrigeration-api-default-key-change-me";
             if (logger_) {
-                logger_->log_events("Debug", "Using default API key. Update 'api.key' in config for production!");
+                logger_->log_events("Error", "Using default API key. Update 'api.key' in config for production!");
             }
         } else {
             if (logger_) {
@@ -469,7 +469,7 @@ json RefrigerationAPI::handle_defrost_trigger_request() {
         response["timestamp"] = std::time(nullptr);
 
         if (logger_) {
-            logger_->log_events("Debug", "API: Manual defrost triggered");
+            logger_->log_events("Info", "API: Manual defrost triggered");
         }
     } catch (const std::exception& e) {
         response["error"] = true;
@@ -486,6 +486,19 @@ json RefrigerationAPI::handle_demo_mode_request(bool enable) {
     json response;
 
     try {
+        // Check if debug mode is enabled - if it is, block demo mode
+        ConfigManager config(config_file_);
+        std::string debug_code = config.get("debug.code");
+
+        if (debug_code == "0") {
+            response["success"] = false;
+            response["message"] = "Demo mode is disabled";
+            response["demo_mode"] = demo_mode.load();
+            response["timestamp"] = std::time(nullptr);
+            return response;
+        }
+
+        // Otherwise allow demo mode change
         bool old_mode = demo_mode.load();
         demo_mode.store(enable);
         response["success"] = true;
@@ -495,7 +508,7 @@ json RefrigerationAPI::handle_demo_mode_request(bool enable) {
         response["timestamp"] = std::time(nullptr);
 
         if (logger_) {
-            logger_->log_events("Debug", "API: Demo mode " + std::string(enable ? "enabled" : "disabled"));
+            logger_->log_events("Info", "API: Demo mode " + std::string(enable ? "enabled" : "disabled"));
         }
     } catch (const std::exception& e) {
         response["error"] = true;
@@ -705,7 +718,7 @@ std::string RefrigerationAPI::handle_download_conditions_request(const std::stri
         // Validate date format (YYYY-MM-DD)
         if (date.length() != 10 || date[4] != '-' || date[7] != '-') {
             if (logger_) {
-                logger_->log_events("Debug", "API: Invalid date format provided: " + date);
+                logger_->log_events("Error", "API: Invalid date format provided: " + date);
             }
             return "HTTP/1.1 400 Bad Request\r\nContent-Type: application/json\r\n\r\n{\"error\": \"Invalid date format. Use YYYY-MM-DD\"}";
         }
@@ -716,7 +729,7 @@ std::string RefrigerationAPI::handle_download_conditions_request(const std::stri
         std::ifstream log_file(log_file_path);
         if (!log_file.is_open()) {
             if (logger_) {
-                logger_->log_events("Debug", "API: Conditions log file not found: " + log_file_path);
+                logger_->log_events("Error", "API: Conditions log file not found: " + log_file_path);
             }
             return "HTTP/1.1 404 Not Found\r\nContent-Type: application/json\r\n\r\n{\"error\": \"Log file not found for date: " + date + "\"}";
         }
@@ -753,7 +766,7 @@ void RefrigerationAPI::start() {
         if (enable_https_ && ssl_context_) {
             logger_->log_events("Debug", "Using HTTPS/TLS encryption");
         } else if (enable_https_) {
-            logger_->log_events("Debug", "HTTPS enabled but SSL context failed to initialize - using HTTP");
+            logger_->log_events("Error", "HTTPS enabled but SSL context failed to initialize - using HTTP");
         }
     }
 

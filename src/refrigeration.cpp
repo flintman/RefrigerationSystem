@@ -117,7 +117,7 @@ void null_mode() {
         status["fan"] = "False";
         status["valve"] = "False";
         status["electric_heater"] = "False";
-        logger.log_events("Debug", "System Status: " + status["status"]);
+        logger.log_events("Info", "System Status: " + status["status"]);
     }
     update_gpio_from_status();
 }
@@ -131,7 +131,7 @@ void cooling_mode() {
         status["fan"] = "True";
         status["valve"] = "False";
         status["electric_heater"] = "False";
-        logger.log_events("Debug", "System Status: " + status["status"]);
+        logger.log_events("Info", "System Status: " + status["status"]);
     }
     update_gpio_from_status();
 }
@@ -145,7 +145,7 @@ void heating_mode() {
         status["fan"] = "True";
         status["valve"] = "True";
         status["electric_heater"] = "True";
-        logger.log_events("Debug", "System Status: " + status["status"]);
+        logger.log_events("Info", "System Status: " + status["status"]);
     }
     update_gpio_from_status();
 }
@@ -161,7 +161,7 @@ void defrost_mode() {
         status["fan"] = "False";
         status["valve"] = "True";
         status["electric_heater"] = "True";
-        logger.log_events("Debug", "System Status: " + status["status"]);
+        logger.log_events("Info", "System Status: " + status["status"]);
     }
     update_gpio_from_status();
 }
@@ -175,7 +175,7 @@ void alarm_mode() {
         status["fan"] = "False";
         status["valve"] = "False";
         status["electric_heater"] = "False";
-        logger.log_events("Debug", "System Status: " + status["status"]);
+        logger.log_events("Error", "System Status: " + status["status"]);
     }
     update_gpio_from_status();
 }
@@ -379,7 +379,7 @@ void display_system_thread() {
     display1.backlight(false);
     display2.backlight(false);
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
-    logger.log_events("Debug", "Display system thread stopped");
+    logger.log_events("Info", "Display system thread stopped");
 }
 
 void setpoint_system_buttons(float min_setpoint, float max_setpoint) {
@@ -535,7 +535,7 @@ void checkDefrostPin() {
             defrost_button_press_start_time = 0;
 
             int setpoint_int = static_cast<int>(setpoint.load());
-            logger.log_events("Debug", "Defrost Button released in " + std::to_string(press_duration) + "  setpoint_int: " + std::to_string(setpoint_int));
+            logger.log_events("Info", "Defrost Button released in " + std::to_string(press_duration) + "  setpoint_int: " + std::to_string(setpoint_int));
             if (press_duration >= 5 && setpoint_int == 65) {
                 if(!pretrip_enable) {
                     pretrip_enable = true;
@@ -546,8 +546,11 @@ void checkDefrostPin() {
                     demo_mode = false;
                     logger.log_events("Debug", "Leaving Demo Mode");
                 } else {
-                    demo_mode = true;
-                    logger.log_events("Debug", "Entering Demo Mode");
+                    if (cfg.get("debug.code") == "1") {
+                        logger.log_events("Debug", "Demo mode activation attempt denied - debug.code not enabled");
+                        demo_mode = true;
+                        logger.log_events("Debug", "Entering Demo Mode");
+                    }
                 }
             } else {
                 if (!trigger_defrost) {
@@ -575,6 +578,7 @@ void checkAlarmPin(){
         if (alarm_reset_button_press_start_time != 0) {
             double now = std::chrono::duration<double>(std::chrono::system_clock::now().time_since_epoch()).count();
             double press_duration = now - alarm_reset_button_press_start_time;
+            logger.log_events("Info", "Alarm Button Pushed for "   + std::to_string(press_duration) + " seconds");
             int setpoint_int = static_cast<int>(setpoint.load());
             alarm_reset_button_press_start_time = 0;
             if (press_duration >= 10 && setpoint_int == 65) {
@@ -620,7 +624,7 @@ void hotspot_start() {
     if (enable_hotspot == 1) {
         wifi_manager.set_credentials(ssid, hotspot_password);
         wifi_manager.start_hotspot();
-        logger.log_events("Debug", "Hotspot started. Checking for clients...");
+        logger.log_events("Info", "Hotspot started. Checking for clients...");
         enable_hotspot_loop = true;
     }
 
@@ -697,7 +701,7 @@ void checkAlarms_system(){
 void pretrip_mode() {
     // If just entered pretrip mode, initialize
     if (pretrip_stage == 0) {
-        logger.log_events("Debug", "Starting Pretrip Mode");
+        logger.log_events("Info", "Starting Pretrip Mode");
         pretrip_stage = 1;
         pretrip_stage_start = time(nullptr);
         cooling_mode();
@@ -765,14 +769,14 @@ void pretrip_mode() {
             pretrip_stage = 0;
             systemAlarm.activateAlarm(0, "9000: Pretrip Completed successfully.");
             systemAlarm.addAlarmCode(9000);
-            logger.log_events("Debug", "Pretrip: Completed");
+            logger.log_events("Info", "Pretrip: Completed");
             return;
     }
 }
 
 void api_system_thread() {
     api.start();
-    logger.log_events("Debug", "API api_system_thread Stopped");
+    logger.log_events("Error", "API api_system_thread Stopped");
 }
 
 void interruptible_sleep(int total_seconds) {
@@ -791,30 +795,29 @@ int main(int argc, char* argv[]) {
     std::signal(SIGINT, signalHandler);
 
     if (geteuid() != 0) {
-        logger.log_events("Debug", "This tool must be run as root (sudo).");
+        logger.log_events("Error", "This tool must be run as root (sudo).");
         return 1;
     }
 
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
-        if (arg == "demo_mode=true" || arg == "--demo" || arg == "-d") {
+        if ((arg == "demo_mode=true" || arg == "--demo" || arg == "-d") && cfg.get("debug.code") == "1") {
             demo_mode = true;
-            logger.log_events("Debug", "Demo mode enabled!");
+            logger.log_events("Info", "Demo mode enabled!");
         }
     }
 
-    logger.log_events("Debug", "Welcome to the Refrigeration system");
-    logger.log_events("Debug", "The system is starting up please wait");
-    logger.log_events("Debug", "Press Ctrl+C to exit gracefully");
-    logger.log_events("Debug", "Version: " + version);
-    logger.log_events("Debug", "System started up");
-
+    logger.log_events("Info", "Welcome to the Refrigeration system");
+    logger.log_events("Info", "The system is starting up please wait");
+    logger.log_events("Info", "Press Ctrl+C to exit gracefully");
+    logger.log_events("Info", "Version: " + version);
+    logger.log_events("Info", "System started up");
     try {
         if (cfg.get("sensor.return") == "0") {
             std::thread hotspot_system(hotspot_start);
             hotspot_system.join();
             running = false; // Stop all threads if any were started elsewhere
-            logger.log_events("Debug", "Exiting because sensors are not initialized.");
+            logger.log_events("Error", "Exiting because sensors are not initialized.");
             // If running as a systemd service, request stop:
             system("systemctl stop refrigeration.service");
             return 0;
