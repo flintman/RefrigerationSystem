@@ -12,9 +12,8 @@ public:
     ~ConfigManager();
 
     std::string get(const std::string& key) const;
-    bool set(const std::string& key, const std::string& value);
     bool deleteConfigVar(const std::string& key);
-    bool save();
+    bool update(const std::string& key, const std::string& value);
     bool resetToDefaults();
 
     const std::map<std::string, ConfigEntry>& getSchema() const {
@@ -28,7 +27,9 @@ private:
 
     void loadFromDotEnv();
     void initializeWithDefaults();
+    bool set(const std::string& key, const std::string& value);
     void saveToDotEnv() const;
+    bool save();
 };
 
 #endif // CONFIG_MANAGER_H

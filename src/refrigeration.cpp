@@ -270,8 +270,7 @@ void update_compressor_on_time(const std::string& new_status) {
         // Compressor just turned OFF
         time_t now = time(nullptr);
         compressor_on_total_seconds += (now - compressor_on_start_time);
-        cfg.set("unit.compressor_run_seconds", std::to_string(compressor_on_total_seconds));
-        cfg.save();
+        cfg.update("unit.compressor_run_seconds", std::to_string(compressor_on_total_seconds));
         compressor_on_start_time = 0;
     }
     last_compressor_status = new_status;
@@ -566,8 +565,7 @@ void checkAlarmPin(){
         if (alarm_reset_button_press_start_time == 0) {
             if(setpointMode){
                 // Save and exit setpoint mode
-                cfg.set("unit.setpoint", std::to_string(static_cast<int>(setpoint.load())));
-                cfg.save();
+                cfg.update("unit.setpoint", std::to_string(static_cast<int>(setpoint.load())));
                 setpointMode = false;
                 logger.log_events("Debug", "Setpoint saved and button mode exited");
             }

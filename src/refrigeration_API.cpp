@@ -412,8 +412,7 @@ json RefrigerationAPI::handle_setpoint_set_request(float new_setpoint) {
         }
 
         setpoint.store(new_setpoint);
-        config.set("unit.setpoint", std::to_string(static_cast<int>(new_setpoint)));
-        config.save();
+        config.update("unit.setpoint", std::to_string(static_cast<int>(new_setpoint)));
 
         response["success"] = true;
         response["setpoint"] = new_setpoint;
@@ -618,8 +617,7 @@ json RefrigerationAPI::handle_config_update_request(const json& config_updates) 
                 }
 
                 // Update the config
-                config.set(key, str_value);
-                config.save();
+                config.update(key, str_value);
                 updated_items[key] = str_value;
 
                 if (logger_) {
@@ -635,7 +633,6 @@ json RefrigerationAPI::handle_config_update_request(const json& config_updates) 
 
         // Save config if there were successful updates
         if (!updated_items.empty()) {
-            config.save();
             response["success"] = true;
             response["updated"] = updated_items;
 
