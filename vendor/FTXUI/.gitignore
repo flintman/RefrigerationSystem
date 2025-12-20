@@ -13,6 +13,7 @@ out/
 !.gitignore
 !CHANGELOG.md
 !CMakeLists.txt
+!aarch64-toolchain.cmake
 !LICENSE
 !README.md
 !codecov.yml
