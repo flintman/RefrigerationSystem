@@ -196,23 +196,17 @@ std::string APIWebInterface::handle_get_request(const std::string& path) {
         json response;
         auto& units = config_manager_->get_units();
 
-        json all_units;
+        // Use cached data from UnitPoller for fast response
+        json all_units = unit_poller_->get_all_unit_data();
         json unit_configs;
 
         for (const auto& unit : units) {
-            // Get status from unit
-            json status = api_proxy_->get_status(unit);
-            if (status.is_null() || status.empty()) {
-                status["system_status"] = "Offline";
+            // If no cached data, mark as offline
+            if (!all_units.contains(unit.id) || all_units[unit.id].empty()) {
+                all_units[unit.id]["system_status"] = "Offline";
             }
-            all_units[unit.id] = status;
-
-            // Get system info (config) from unit
-            json system_info = api_proxy_->get_system_info(unit);
-            if (system_info.is_null() || system_info.empty()) {
-                system_info = json::object();
-            }
-            unit_configs[unit.id] = system_info;
+            // Optionally, you can cache configs in UnitPoller as well, but for now, leave empty
+            unit_configs[unit.id] = json::object();
         }
 
         response["unit_data"] = all_units;
