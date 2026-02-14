@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="72dp"
+    android:height="72dp"
+    android:viewportWidth="72"
+    android:viewportHeight="72">
+
+    <!-- Compressor main cylindrical body (white) -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M20,24 C20,20 24,18 36,18 C48,18 52,20 52,24 L52,44 C52,48 48,50 36,50 C24,50 20,48 20,44 Z" />
+
+    <!-- Top dome shading -->
+    <path
+        android:fillColor="#E3F2FD"
+        android:fillAlpha="0.12"
+        android:pathData="M20,24 C20,20 24,18 36,18 C48,18 52,20 52,24" />
+
+    <!-- Pulley wheel (front) -->
+    <path
+        android:fillColor="#1565C0"
+        android:pathData="M28,36a6,6 0 1 0 12,0a6,6 0 1 0 -12,0" />
+    <path
+        android:fillColor="#90CAF9"
+        android:pathData="M32,36a2.5,2.5 0 1 0 5,0a2.5,2.5 0 1 0 -5,0" />
+
+    <!-- Belt groove (outer ring) -->
+    <path
+        android:fillColor="#0D47A1"
+        android:fillAlpha="0.14"
+        android:pathData="M28,36a9,9 0 1 0 18,0a9,9 0 1 0 -18,0" />
+
+    <!-- Mounting feet -->
+    <path
+        android:fillColor="#CFD8DC"
+        android:pathData="M18,44 L22,44 L22,48 L18,48 z M50,44 L54,44 L54,48 L50,48 z" />
+
+    <!-- Inlet tubing (left) - single suction line -->
+    <path
+        android:strokeColor="#BBDEFB"
+        android:strokeWidth="2"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:fillColor="@android:color/transparent"
+        android:pathData="M14,36 C16,34 18,34 20,34" />
+
+    <!-- Outlet tubing (right) - single discharge line -->
+    <path
+        android:strokeColor="#90CAF9"
+        android:strokeWidth="2"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:fillColor="@android:color/transparent"
+        android:pathData="M52,36 C54,34 56,34 58,34" />
+
+    <!-- Small compressor label accent -->
+    <path
+        android:fillColor="#1565C0"
+        android:pathData="M34,28 L38,28 L38,30 L34,30 z" />
+
+</vector>

@@ -1,0 +1,44 @@
+# Android Studio / IntelliJ
+.idea/
+!.idea/codeStyles
+!.idea/runConfigurations
+!.idea/inspectionProfiles
+local.properties
+
+# Gradle
+.gradle/
+build/
+app/release/
+**/build/
+
+# Local configuration
+local.properties
+
+# Log/Cache files
+*.log
+*.cache
+
+# Android specific
+*.apk
+*.ap_
+*.aab
+*.dex
+*.class
+*.keystore
+*.jks
+
+# Generated
+captures/
+.externalNativeBuild/
+.cxx/
+
+# OS-specific
+.DS_Store
+Thumbs.db
+
+# Jetpack Compose
+*.kotlin_module
+
+# Misc
+*.iml
+

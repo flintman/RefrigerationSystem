@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Flintman\'s Tech-Tool</string>
+
+    <!-- Top-level titles -->
+    <string name="units_manager_title">Refrigeration Manager</string>
+    <string name="unit_status_title">Refrigeration Status</string>
+
+    <!-- Common labels / actions -->
+    <string name="last_refresh_label">Last refresh:</string>
+    <string name="log_button">Log</string>
+    <string name="refresh">Refresh</string>
+    <string name="add_unit">Add Unit</string>
+    <string name="status_button">Status</string>
+    <string name="edit_button">Edit</string>
+
+    <!-- Actions on unit/status page -->
+    <string name="reset_alarms">Reset Alarms</string>
+    <string name="trigger_defrost">Defrost</string>
+    <string name="set_setpoint">Setpoint</string>
+    <string name="edit_config">Config</string>
+    <string name="setpoint_label">Setpoint F</string>
+
+    <!-- Dialogs / confirmations -->
+    <string name="confirm_delete_title">Delete unit</string>
+    <string name="confirm_delete_message">Are you sure you want to delete unit "%1$s"?</string>
+    <string name="delete">Delete</string>
+    <string name="cancel">Cancel</string>
+
+    <!-- Connection test dialog -->
+    <string name="connection_test_title">Connection Test</string>
+    <string name="endpoint_label">Endpoint</string>
+    <string name="status_code_label">Status code</string>
+    <string name="online_label">Online</string>
+    <string name="response_label">Response</string>
+
+    <!-- Errors / feedback -->
+    <string name="fetch_failed">Fetch failed: %1$s</string>
+    <string name="no_data">No data</string>
+    <string name="invalid_setpoint">Invalid setpoint</string>
+    <string name="setpoint_updated">Setpoint updated</string>
+
+    <!-- System info labels -->
+    <string name="defrost_setpoint_label">Defrost setpoint</string>
+    <string name="coil_temp_label">Coil temp</string>
+    <string name="alarm_shutdown">ALARM: Shutdown</string>
+    <string name="alarm_warning">ALARM: Warning</string>
+    <string name="relays_label">Relays</string>
+    <string name="sensors_label">Sensors</string>
+    <string name="system_info_label">System Info</string>
+    <string name="unit_label">Unit: %1$s</string>
+    <string name="status_label">Status: %1$s</string>
+    <string name="no_data_short">No data</string>
+
+    <!-- Demo / misc -->
+    <string name="demo_mode">Demo Mode</string>
+    <string name="save">Save</string>
+
+    <!-- New strings added -->
+    <string name="reset_button">Reset</string>
+    <string name="offline_label">Offline</string>
+    <string name="codes_label">Codes: %1$s</string>
+    <string name="last_response_label">Last response: %1$s</string>
+    <string name="coil_below_defrost">Coil below defrost temp - eligible for defrost</string>
+    <string name="swipe_right_delete_hint">Swipe right to delete</string>
+    <string name="swipe_hint_both">Swipe right to delete, left to edit</string>
+
+    <!-- Relay and status labels -->
+    <string name="status_null">Null</string>
+    <string name="status_cooling">Cooling</string>
+    <string name="status_heating">Heating</string>
+    <string name="status_defrost">Defrost</string>
+    <string name="status_alarm">Alarm</string>
+
+    <string name="relay_on">ON</string>
+    <string name="relay_off">OFF</string>
+
+    <!-- Reorder menu strings -->
+    <string name="move_up">Move up</string>
+    <string name="move_down">Move down</string>
+    <string name="send_to_top">Send to top</string>
+    <string name="send_to_bottom">Send to bottom</string>
+
+</resources>

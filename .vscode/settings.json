@@ -73,5 +73,6 @@
         "future": "cpp",
         "list": "cpp",
         "set": "cpp"
-    }
+    },
+    "java.configuration.updateBuildConfiguration": "automatic"
 }
